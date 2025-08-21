@@ -1,6 +1,8 @@
 import * as repo from "./auth.repo.js";
 import bcrypt from "bcrypt";
 import { signAccess, signRefresh, verifyRefresh } from "../../core/auth/jwt.js";
+import { hasAnyUser } from "./auth.repo.js";
+import crypto from "crypto";
 
 export async function login(username, password) {
   username = String(username || "").trim();
@@ -52,6 +54,11 @@ export async function login(username, password) {
   const accessToken = signAccess(user);
   const refreshToken = signRefresh(user);
   return { accessToken, refreshToken, user: sanitize(user) };
+}
+
+export async function checkInitialized() {
+  const exists = await hasAnyUser();
+  return { initialized: exists };
 }
 
 export async function refresh(token) {

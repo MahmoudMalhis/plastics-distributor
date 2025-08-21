@@ -1,4 +1,10 @@
+// server/src/modules/auth/auth.repo.js
 import db from "../../db/knex.js";
+
+export async function hasAnyUser() {
+  const row = await db("users").count({ c: "*" }).first();
+  return Number(row?.c || 0) > 0;
+}
 
 export async function countUsers() {
   const row = await db("users").count({ count: "id" }).first();
@@ -39,25 +45,23 @@ export async function createUser({
 }
 
 export async function findActiveTokenByHash(tokenHash) {
-  // نختار الأحدث لو تكرر لسبب ما
-  const row = await knex("password_set_tokens")
+  const row = await db("password_set_tokens")
     .where({ token_hash: tokenHash })
     .whereNull("used_at")
-    .andWhere("expires_at", ">", knex.fn.now())
+    .andWhere("expires_at", ">", db.fn.now())
     .orderBy("id", "desc")
     .first();
-
   return row || null;
 }
 
 export async function markPasswordTokenUsed(id) {
-  return knex("password_set_tokens")
+  return db("password_set_tokens")
     .where({ id })
-    .update({ used_at: knex.fn.now() });
+    .update({ used_at: db.fn.now() });
 }
 
-export async function getUserById(id) {
-  return knex("users").where({ id }).first();
+export function getUserById(id) {
+  return db("users").where({ id }).first();
 }
 
 export async function updateUserPasswordAndFlags(
@@ -69,16 +73,14 @@ export async function updateUserPasswordAndFlags(
   if (typeof must_change_password === "boolean")
     patch.must_change_password = must_change_password;
 
-  await knex("users").where({ id: userId }).update(patch);
-  return knex("users").where({ id: userId }).first();
+  await db("users").where({ id: userId }).update(patch);
+  return db("users").where({ id: userId }).first();
 }
 
 export async function revokeRefreshTokensForUser(userId) {
-  // لو جدول refresh_tokens غير موجود عندك تجاهل النداء أو أنشئ الجدول (أنتي أنشأتيه مؤخراً 👍)
   try {
-    await knex("refresh_tokens").where({ user_id: userId }).del();
+    await db("refresh_tokens").where({ user_id: userId }).del();
   } catch (e) {
-    // لا تكسر العملية لو الجدول غير موجود
     if (String(e?.code) !== "ER_NO_SUCH_TABLE") throw e;
   }
 }

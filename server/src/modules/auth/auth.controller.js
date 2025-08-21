@@ -11,6 +11,15 @@ export async function login(req, res) {
   }
 }
 
+export async function initialized(req, res, next) {
+  try {
+    const data = await svc.checkInitialized();
+    res.json(data); // { initialized: true/false }
+  } catch (e) {
+    next(e);
+  }
+}
+
 export async function refresh(req, res) {
   try {
     const { refreshToken } = req.body || {};

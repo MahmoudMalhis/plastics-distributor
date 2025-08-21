@@ -9,6 +9,7 @@ import {
 
 const router = Router();
 
+router.get("/initialized", ctrl.initialized);
 router.post("/login", loginRateLimiter, ctrl.login);
 router.post("/refresh", ctrl.refresh);
 router.get(

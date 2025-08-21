@@ -1,15 +1,21 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../../../lib/api";
+import { useAuthInit, useLogin, useSetupInitialAdmin } from "../hooks/useAuth";
+import { useMemo } from "react";
 
 export default function Login() {
-  const [initialized, setInitialized] = useState(null);
-  const [okMsg, setOkMsg] = useState(false);
+  const { initialized, loading: initLoading, error: initError } = useAuthInit();
+  const { login, loading: loginLoading, error: loginError } = useLogin();
+  const {
+    setupInitialAdmin,
+    loading: setupLoading,
+    error: setupError,
+  } = useSetupInitialAdmin();
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+
   const [adminUser, setAdminUser] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [adminPassword2, setAdminPassword2] = useState("");
@@ -17,96 +23,39 @@ export default function Login() {
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await api.get(`/api/auth/initialized`);
-        setInitialized(!!data.initialized);
-      } catch (e) {
-        console.error("Error checking initialization:", e);
-        setInitialized(true);
-      }
-    })();
-  }, []);
+  const loading = initLoading || loginLoading || setupLoading;
+  const error = useMemo(
+    () => initError || loginError || setupError || "",
+    [initError, loginError, setupError]
+  );
 
+  // 3) أحداث الإرسال
   const submit = async (e) => {
     e.preventDefault();
-    setError("");
-    setOkMsg("");
-    if (!username || !password) {
-      setError("الرجاء إدخال اسم المستخدم وكلمة المرور.");
-      return;
-    }
-    try {
-      setLoading(true);
-      const { data } = await api.post(`/api/auth/login`, {
-        username,
-        password,
-      });
-
-      // خزّن التوكنات
-      localStorage.setItem("accessToken", data.accessToken);
-      localStorage.setItem("refreshToken", data.refreshToken);
-
-      // توجيه حسب الدور
-      if (data?.user?.role === "admin") {
-        navigate("/admin/products", { replace: true });
-      } else {
-        navigate("/distributor/catalog", { replace: true });
-      }
-    } catch (e) {
-      const msg =
-        e?.response?.data?.error === "bad creds"
-          ? "بيانات الدخول غير صحيحة."
-          : e?.response?.data?.error || "حدث خطأ أثناء تسجيل الدخول.";
-      setError(msg);
-    } finally {
-      setLoading(false);
+    const res = await login({ username, password });
+    if (res.ok) {
+      const role = res.data?.user?.role;
+      if (role === "admin") navigate("/admin/products", { replace: true });
+      else navigate("/distributor/catalog", { replace: true });
     }
   };
 
   const submitInitialization = async (e) => {
     e.preventDefault();
-    setError("");
-    setOkMsg("");
-    if (!adminUser || !adminPassword || !adminPassword2) {
-      setError("الرجاء إدخال اسم المستخدم وكلمة المرور.");
-      return;
-    }
-    if (adminPassword !== adminPassword2) {
-      setError("كلمات المرور غير متطابقة.");
-      return;
-    }
-    try {
-      setLoading(true);
-      const { data } = await api.post(`/api/auth/setup-initial-admin`, {
+    const res = await setupInitialAdmin({
+      username: adminUser,
+      password: adminPassword,
+      password2: adminPassword2,
+    });
+    if (res.ok) {
+      // نجاح الإنشاء → سجّل دخول مباشرةً بنفس البيانات
+      const loginRes = await login({
         username: adminUser,
         password: adminPassword,
       });
-      if (data?.ok) {
-        // سجّل دخول تلقائي
-        const loginRes = await api.post(`/api/auth/login`, {
-          username: adminUser,
-          password: adminPassword,
-        });
-        localStorage.setItem("accessToken", loginRes.data.accessToken);
-        localStorage.setItem("refreshToken", loginRes.data.refreshToken);
-        navigate("/admin/products", { replace: true }); // أو /admin/orders حسب ما بدك
-        return;
+      if (loginRes.ok) {
+        navigate("/admin/products", { replace: true });
       }
-    } catch (e) {
-      const msg =
-        e?.response?.data?.error || "حدث خطأ أثناء إنشاء حساب المسؤول.";
-      if (msg === "already-initialized") {
-        setInitialized(true);
-        setError("تم تهيئة النظام بالفعل. يمكنك تسجيل الدخول.");
-      } else if (msg === "username taken") {
-        setError("اسم المستخدم مستخدم بالفعل. الرجاء اختيار اسم آخر.");
-      } else {
-        setError(msg || "حدث خطأ أثناء إنشاء حساب المسؤول.");
-      }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -206,12 +155,9 @@ export default function Login() {
               </div>
 
               {/* Error */}
-              {(error || okMsg) && (
+              {error && (
                 <div className="px-4">
                   {error && <div className="text-red-600 text-sm">{error}</div>}
-                  {okMsg && (
-                    <div className="text-green-600 text-sm">{okMsg}</div>
-                  )}
                 </div>
               )}
 
@@ -346,12 +292,9 @@ export default function Login() {
                 </label>
               </div>
               {/* Error */}
-              {(error || okMsg) && (
+              {error && (
                 <div className="px-4">
                   {error && <div className="text-red-600 text-sm">{error}</div>}
-                  {okMsg && (
-                    <div className="text-green-600 text-sm">{okMsg}</div>
-                  )}
                 </div>
               )}
 
