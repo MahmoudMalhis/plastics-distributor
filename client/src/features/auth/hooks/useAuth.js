@@ -1,11 +1,6 @@
-// src/features/auth/hooks/auth.hooks.js
 import { useEffect, useState, useCallback } from "react";
 import useApiState from "../../../hooks/useApiState";
-import {
-  checkInitialized,
-  login as loginApi,
-  setupInitialAdmin as setupApi,
-} from "../api/auth.api";
+import { checkInitialized, login as loginApi } from "../api/auth.api";
 
 /** يتحقق من حالة تهيئة النظام (هل يوجد admin أم لا) */
 export function useAuthInit() {
@@ -14,21 +9,19 @@ export function useAuthInit() {
 
   useEffect(() => {
     let cancelled = false;
-
     (async () => {
       reset();
       try {
         setLoading(true);
         const data = await checkInitialized();
-        if (!cancelled) {
-          setInitialized(!!data.initialized);
-        }
+        if (!cancelled) setInitialized(!!data.initialized);
       } catch (e) {
-        const errorMsg =
+        // فى حالة الخطأ اعتبر النظام مهيّأً لتجنّب توقّف الشاشة
+        setError(
           e?.message ||
-          e?.response?.data?.error ||
-          "تعذر التحقق من حالة التهيئة";
-        setError(errorMsg);
+            e?.response?.data?.error ||
+            "تعذر التحقق من حالة التهيئة"
+        );
         setInitialized(true);
       } finally {
         setLoading(false);
@@ -42,7 +35,10 @@ export function useAuthInit() {
   return { initialized, loading, error };
 }
 
-/** إنشاء أول حساب مسؤول للنظام */
+/**
+ * تهيئة المسؤول الأول باستخدام منطق الـ bootstrap فى الخادم.
+ * تستدعى login مباشرةً عندما لا يوجد مستخدمون، ثم تخزن التوكنات فى localStorage.
+ */
 export function useSetupInitialAdmin() {
   const { loading, error, setLoading, setError, reset } = useApiState();
 
@@ -57,15 +53,18 @@ export function useSetupInitialAdmin() {
         setError("كلمات المرور غير متطابقة.");
         return { ok: false };
       }
-
       try {
         setLoading(true);
-        const data = await setupApi({ username, password }); // يُتوقع { ok: true } أو يرمي خطأ برسالة
+        const data = await loginApi({ username, password });
+        if (data?.accessToken)
+          localStorage.setItem("accessToken", data.accessToken);
+        if (data?.refreshToken)
+          localStorage.setItem("refreshToken", data.refreshToken);
         return { ok: true, data };
       } catch (e) {
-        const msg =
-          e?.response?.data?.error || "حدث خطأ أثناء إنشاء حساب المسؤول.";
-        setError(msg);
+        setError(
+          e?.response?.data?.error || "حدث خطأ أثناء إنشاء حساب المسؤول."
+        );
         return { ok: false };
       } finally {
         setLoading(false);
@@ -88,20 +87,18 @@ export function useLogin() {
         setError("الرجاء إدخال اسم المستخدم وكلمة المرور.");
         return { ok: false };
       }
-
       try {
         setLoading(true);
         const data = await loginApi({ username, password });
-        // يُتوقع: { accessToken, refreshToken, user:{ role, ... } }
         localStorage.setItem("accessToken", data.accessToken);
         localStorage.setItem("refreshToken", data.refreshToken);
         return { ok: true, data };
       } catch (e) {
-        const msg =
+        setError(
           e?.response?.data?.error === "bad creds"
             ? "بيانات الدخول غير صحيحة."
-            : e?.response?.data?.error || "حدث خطأ أثناء تسجيل الدخول.";
-        setError(msg);
+            : e?.response?.data?.error || "حدث خطأ أثناء تسجيل الدخول."
+        );
         return { ok: false };
       } finally {
         setLoading(false);

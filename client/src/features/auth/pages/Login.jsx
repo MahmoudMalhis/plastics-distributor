@@ -39,23 +39,17 @@ export default function Login() {
       else navigate("/distributor/catalog", { replace: true });
     }
   };
-
   const submitInitialization = async (e) => {
     e.preventDefault();
+    // setupInitialAdmin يستدعي login داخليًا عند عدم وجود مستخدمين
     const res = await setupInitialAdmin({
       username: adminUser,
       password: adminPassword,
       password2: adminPassword2,
     });
     if (res.ok) {
-      // نجاح الإنشاء → سجّل دخول مباشرةً بنفس البيانات
-      const loginRes = await login({
-        username: adminUser,
-        password: adminPassword,
-      });
-      if (loginRes.ok) {
-        navigate("/admin/products", { replace: true });
-      }
+      // بمجرد إنشاء المسؤول بنجاح، انتقل إلى لوحة التحكم الإدارية
+      navigate("/admin/products", { replace: true });
     }
   };
 

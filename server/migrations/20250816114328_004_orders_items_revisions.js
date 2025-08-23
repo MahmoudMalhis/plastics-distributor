@@ -1,9 +1,10 @@
 export async function up(knex) {
-  await knex.schema.createTable("orders", (t) => {
-    t.increments("id");
-    t.string("code", 191).notNullable().unique();
+  await knex.schema.createTable("orders", (table) => {
+    table.increments("id");
+    table.string("code", 191).notNullable().unique();
 
-    t.integer("distributor_id")
+    table
+      .integer("distributor_id")
       .unsigned()
       .notNullable()
       .references("id")
@@ -11,7 +12,8 @@ export async function up(knex) {
       .onUpdate("CASCADE")
       .onDelete("RESTRICT");
 
-    t.integer("created_by")
+    table
+      .integer("created_by")
       .unsigned()
       .notNullable()
       .references("id")
@@ -19,7 +21,8 @@ export async function up(knex) {
       .onUpdate("CASCADE")
       .onDelete("RESTRICT");
 
-    t.integer("customer_id")
+    table
+      .integer("customer_id")
       .unsigned()
       .nullable()
       .references("id")
@@ -27,28 +30,35 @@ export async function up(knex) {
       .onUpdate("CASCADE")
       .onDelete("SET NULL");
 
-    t.enu("status", ["draft", "submitted", "approved", "fulfilled", "canceled"])
+    table
+      .enu("status", [
+        "draft",
+        "submitted",
+        "approved",
+        "fulfilled",
+        "canceled",
+      ])
       .notNullable()
       .defaultTo("draft");
 
-    t.decimal("total", 12, 2).notNullable().defaultTo(0);
-    t.text("notes");
+    table.decimal("total", 12, 2).notNullable().defaultTo(0);
+    table.text("notes");
 
-    t.enu("payment_method", ["cash", "installments", "checks"]).nullable();
-    t.integer("installment_plan_id").unsigned().nullable();
-    t.string("check_note", 255);
+    table.enu("payment_method", ["cash", "installments", "checks"]).nullable();
+    table.integer("installment_plan_id").unsigned().nullable();
+    table.string("check_note", 255);
 
-    t.datetime("submitted_at").nullable();
-    t.datetime("approved_at").nullable();
-    t.datetime("fulfilled_at").nullable();
-    t.datetime("canceled_at").nullable();
+    table.datetime("submitted_at").nullable();
+    table.datetime("approved_at").nullable();
+    table.datetime("fulfilled_at").nullable();
+    table.datetime("canceled_at").nullable();
 
-    t.timestamp("created_at").defaultTo(knex.fn.now());
-    t.timestamp("updated_at").defaultTo(knex.fn.now());
+    table.timestamp("created_at").defaultTo(knex.fn.now());
+    table.timestamp("updated_at").defaultTo(knex.fn.now());
   });
 
-  await knex.schema.createTable("order_items", (t) => {
-    t.increments("id");
+  await knex.schema.createTable("order_items", (table) => {
+    table.increments("id");
     table
       .integer("order_id")
       .unsigned()

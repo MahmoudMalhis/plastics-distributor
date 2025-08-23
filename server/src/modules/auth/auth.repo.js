@@ -84,3 +84,50 @@ export async function revokeRefreshTokensForUser(userId) {
     if (String(e?.code) !== "ER_NO_SUCH_TABLE") throw e;
   }
 }
+
+/**
+ * أضف رمز إنعاش جديد إلى قاعدة البيانات. يتم تخزين تجزئة الرمز (token_hash)
+ * وليس الرمز نفسه لضمان الأمان. يتم أيضًا تسجيل تاريخ انتهاء الصلاحية (expiresAt).
+ */
+export async function addRefreshToken({ userId, tokenHash, expiresAt }) {
+  try {
+    await db("refresh_tokens").insert({
+      user_id: userId,
+      token_hash: tokenHash,
+      expires_at: expiresAt,
+      created_at: db.fn.now(),
+    });
+  } catch (e) {
+    // إذا لم يكن الجدول موجودًا فلن نفعل شيئًا.
+    if (String(e?.code) !== "ER_NO_SUCH_TABLE") throw e;
+  }
+}
+
+/**
+ * ابحث عن رمز إنعاش صالح (غير منتهي).
+ * يعيد السجل إذا وجد، أو null إن لم يوجد.
+ */
+export async function findValidRefreshToken(tokenHash) {
+  try {
+    const row = await db("refresh_tokens")
+      .where({ token_hash: tokenHash })
+      .andWhere("expires_at", ">", db.fn.now())
+      .orderBy("id", "desc")
+      .first();
+    return row || null;
+  } catch (e) {
+    if (String(e?.code) === "ER_NO_SUCH_TABLE") return null;
+    throw e;
+  }
+}
+
+/**
+ * حذف رمز إنعاش واحد من الجدول باستخدام تجزئته.
+ */
+export async function deleteRefreshToken(tokenHash) {
+  try {
+    await db("refresh_tokens").where({ token_hash: tokenHash }).del();
+  } catch (e) {
+    if (String(e?.code) !== "ER_NO_SUCH_TABLE") throw e;
+  }
+}
