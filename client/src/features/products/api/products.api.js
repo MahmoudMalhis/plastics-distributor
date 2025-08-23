@@ -1,26 +1,60 @@
-// src/features/products/api/products.api.js
+// client/src/features/products/api/products.api.js
 import { api } from "../../../lib/api";
 
-/** جلب المنتجات مع فلاتر */
+export function imageUrl(path) {
+  const raw = String(path || "");
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const baseURL = api?.defaults?.baseURL || "";
+  let base = baseURL.replace(/\/?api\/?$/i, "");
+  if (!base.endsWith("/")) base += "/";
+  const clean = raw.replace(/^\/+/, "");
+  return base + clean;
+}
+
 export async function listProducts(params) {
-  const r = await api.get("/api/products", { params });
-  const d = r.data;
-  return Array.isArray(d) ? d : d.items || [];
+  const { data } = await api.get("/api/products", { params });
+  if (Array.isArray(data)) return data;
+  return data?.items || data?.rows || [];
 }
 
-/** إنشاء منتج جديد */
+export async function searchProducts({
+  q,
+  categoryId,
+  page = 1,
+  pageSize = 12,
+  sort = "latest",
+} = {}) {
+  const params = {
+    q,
+    categoryId,
+    category_id: categoryId,
+    page,
+    pageSize,
+    sort,
+  };
+  Object.keys(params).forEach(
+    (k) => params[k] === undefined && delete params[k]
+  );
+
+  const { data } = await api.get("/api/products", { params });
+
+  if (Array.isArray(data)) return { rows: data, total: data.length };
+  return {
+    rows: data?.rows || data?.items || [],
+    total: Number(data?.total ?? data?.count ?? 0),
+  };
+}
+
 export async function createProduct(dto) {
-  const r = await api.post("/api/products", dto);
-  return r.data;
+  const { data } = await api.post("/api/products", dto);
+  return data;
 }
 
-/** تعديل منتج */
 export async function updateProduct(id, dto) {
-  const r = await api.patch(`/api/products/${id}`, dto);
-  return r.data;
+  const { data } = await api.patch(`/api/products/${id}`, dto);
+  return data;
 }
 
-/** رفع صورة */
 export function uploadProductImage(id, file) {
   const fd = new FormData();
   fd.append("image", file);
@@ -29,10 +63,15 @@ export function uploadProductImage(id, file) {
   });
 }
 
-/** أرشفة/استرجاع */
 export function archiveProduct(id) {
   return api.post(`/api/products/${id}/archive`);
 }
 export function restoreProduct(id) {
   return api.post(`/api/products/${id}/restore`);
+}
+
+export async function listCategories() {
+  const { data } = await api.get("/api/categories");
+  if (Array.isArray(data)) return { rows: data };
+  return data || { rows: [] };
 }

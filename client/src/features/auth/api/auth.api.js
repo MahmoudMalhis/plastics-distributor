@@ -28,10 +28,10 @@ export async function refreshToken(refreshToken) {
   return data;
 }
 
-export async function setPasswordWithToken({ token, password }) {
+export async function setPasswordWithToken({ token, newPassword }) {
   const { data } = await api.post(`/api/auth/set-password`, {
     token,
-    password,
+    newPassword,
   });
   return data;
 }

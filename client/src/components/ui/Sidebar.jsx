@@ -10,10 +10,51 @@ export default function Sidebar() {
     setOpen(!open);
   };
 
+  const role = localStorage.getItem("userRole");
+
   const links = [
-    { to: "/admin/products", label: "المنتجات", icon: "inventory_2" },
-    { to: "/admin/categories", label: "التصنيفات", icon: "category" },
-    { to: "/admin/distributors", label: "الموردين", icon: "people" },
+    {
+      to: "/admin/products",
+      label: "المنتجات",
+      icon: "inventory_2",
+      role: "admin",
+    },
+    {
+      to: "/admin/categories",
+      label: "التصنيفات",
+      icon: "category",
+      role: "admin",
+    },
+    {
+      to: "/admin/distributors",
+      label: "الموزعين",
+      icon: "local_shipping",
+      role: "admin",
+    },
+    {
+      to: "/distributor/catalog",
+      label: "الكاتالوج",
+      icon: "storefront",
+      role: "distributor",
+    },
+    {
+      to: "/distributor/cart",
+      label: "السلة",
+      icon: "shopping_cart",
+      role: "distributor",
+    },
+    {
+      to: "/distributor/orders",
+      label: "الطلبات",
+      icon: "receipt_long",
+      role: "distributor",
+    },
+    {
+      to: "/distributor/orders/:id",
+      label: "تفاصيل الطلب",
+      icon: "receipt",
+      role: "distributor",
+    },
   ];
 
   const isActive = (to) => pathname === to;
@@ -21,6 +62,8 @@ export default function Sidebar() {
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
+
+  const userFalter = links.filter((item) => item.role.includes(role));
 
   return (
     <>
@@ -58,7 +101,7 @@ export default function Sidebar() {
 
         <nav className="mt-2 flex-1">
           <ul>
-            {links.map((l) => (
+            {userFalter.map((l) => (
               <li key={l.to} className="mb-2 cursor-pointer">
                 <Link
                   to={l.to}

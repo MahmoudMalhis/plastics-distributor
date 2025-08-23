@@ -29,26 +29,54 @@ export default function Login() {
     [initError, loginError, setupError]
   );
 
-  // 3) أحداث الإرسال
   const submit = async (e) => {
     e.preventDefault();
     const res = await login({ username, password });
     if (res.ok) {
-      const role = res.data?.user?.role;
-      if (role === "admin") navigate("/admin/products", { replace: true });
-      else navigate("/distributor/catalog", { replace: true });
+      const { accessToken, token, user } = res.data || {};
+      const at = accessToken || token;
+      if (at) localStorage.setItem("accessToken", at);
+
+      if (user) {
+        let role = "";
+        if (user.role && user.role.trim()) {
+          role = user.role.toLowerCase().trim();
+        } else if (user.distributor_id) {
+          role = "distributor";
+        } else {
+          role = "admin";
+        }
+
+        const updatedUser = { ...user, role };
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+        localStorage.setItem("userRole", role);
+
+        if (role === "admin") {
+          navigate("/admin/products", { replace: true });
+        } else if (role === "distributor") {
+          navigate("/distributor/catalog", { replace: true });
+        }
+      }
     }
   };
+
   const submitInitialization = async (e) => {
     e.preventDefault();
-    // setupInitialAdmin يستدعي login داخليًا عند عدم وجود مستخدمين
     const res = await setupInitialAdmin({
       username: adminUser,
       password: adminPassword,
       password2: adminPassword2,
     });
+
     if (res.ok) {
-      // بمجرد إنشاء المسؤول بنجاح، انتقل إلى لوحة التحكم الإدارية
+      const { accessToken, token, user } = res.data || {};
+      const at = accessToken || token;
+      if (at) localStorage.setItem("accessToken", at);
+      if (user) {
+        localStorage.setItem("user", JSON.stringify(user));
+        if (user.role) localStorage.setItem("userRole", user.role);
+      }
+
       navigate("/admin/products", { replace: true });
     }
   };
@@ -135,7 +163,7 @@ export default function Login() {
                           <path d="M128,56c39.66,0,77.33,29.33,104,56-26.67,26.67-64.34,56-104,56S50.67,138.67,24,112C50.67,85.33,88.34,56,128,56Zm0,88a32,32,0,1,0-32-32A32,32,0,0,0,128,144Z" />
                         </svg>
                       )}
-                    </button>{" "}
+                    </button>
                     <input
                       dir="rtl"
                       type={showPwd ? "text" : "password"}
