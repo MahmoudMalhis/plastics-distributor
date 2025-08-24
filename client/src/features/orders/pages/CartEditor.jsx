@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { imageUrl } from "../../products/api/products.api";
 import { useCart, setQty, removeItem, clearCart } from "../state/cart.store";
 import { createOrder } from "../api/orders.api";
+import QuantityInput from "../../../components/ui/QuantityInput";
+import PageHeader from "../../../components/ui/PageHeader";
 
 export default function CartEditor() {
   const { items, totals } = useCart();
@@ -45,12 +47,12 @@ export default function CartEditor() {
       style={{ fontFamily: '"Public Sans","Noto Sans",sans-serif' }}
     >
       <div className="max-w-5xl mx-auto py-5">
-        <Title>سلة المشتريات</Title>
+        <PageHeader title="الطلبيات"></PageHeader>
 
         {items.length === 0 ? (
-          <div className="px-4 text-center text-[#49739c]">سلتك فارغة.</div>
+          <div className="text-center text-[#49739c]">سلتك فارغة.</div>
         ) : (
-          <form onSubmit={submit} className="px-4">
+          <form onSubmit={submit}>
             <div className="bg-white border border-[#cedbe8] rounded-xl overflow-hidden">
               <table className="w-full text-right">
                 <thead className="bg-slate-100 text-[#49739c]">
@@ -63,48 +65,44 @@ export default function CartEditor() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((it) => {
-                    const total = Number(it.price || 0) * Number(it.qty || 0);
+                  {items.map((item) => {
+                    const total =
+                      Number(item.price || 0) * Number(item.qty || 0);
                     return (
                       <tr
-                        key={it.productId}
+                        key={item.productId}
                         className="border-t border-[#eef3f7]"
                       >
                         <td className="p-3">
                           <div className="flex items-center gap-3">
                             <div className="w-16 h-12 bg-slate-100 rounded overflow-hidden">
-                              {it.image ? (
+                              {item.image ? (
                                 <img
-                                  src={imageUrl(it.image)}
+                                  src={imageUrl(item.image)}
                                   className="w-full h-full object-cover"
-                                  alt={it.name}
+                                  alt={item.name}
                                 />
                               ) : null}
                             </div>
                             <div>
                               <div className="text-[#0d141c] font-semibold">
-                                {it.name}
+                                {item.name}
                               </div>
                               <div className="text-xs text-[#49739c]">
-                                SKU: {it.sku || "—"}
+                                SKU: {item.sku || "—"}
                               </div>
                             </div>
                           </div>
                         </td>
                         <td className="p-3">
-                          {Number(it.price).toLocaleString()} ₪
+                          {Number(item.price).toLocaleString()} ₪
                         </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
-                            <input
-                              dir="ltr"
-                              type="number"
+                            <QuantityInput
+                              value={item.qty}
+                              onChange={(v) => setQty(item.productId, v)}
                               min={1}
-                              value={it.qty}
-                              onChange={(e) =>
-                                setQty(it.productId, e.target.value)
-                              }
-                              className="w-20 border border-[#cedbe8] rounded-lg bg-slate-50 h-10 px-2"
                             />
                           </div>
                         </td>
@@ -112,7 +110,7 @@ export default function CartEditor() {
                         <td className="p-3">
                           <button
                             type="button"
-                            onClick={() => removeItem(it.productId)}
+                            onClick={() => removeItem(item.productId)}
                             className="h-10 px-3 rounded-lg border border-[#cedbe8] bg-white"
                           >
                             حذف

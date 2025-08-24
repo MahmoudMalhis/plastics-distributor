@@ -1,37 +1,23 @@
-export default function ImageUpload({ file, onFileChange }) {
+import MyDropzone from "./MyDropzone";
+
+/**
+ * Drag‑and‑drop image upload component. It provides a dashed drop zone with
+ * a file chooser button and optional preview. A new optional prop
+ * `hidePreview` allows consumers to suppress the built‑in preview (e.g. when
+ * using a custom preview elsewhere). When `hidePreview` is true, the preview
+ * block will not be rendered.
+ */
+export default function ImageUpload({
+  file,
+  onFileChange,
+  hidePreview = false,
+}) {
   return (
     <>
-      <label
-        htmlFor="prod-image-input"
-        className="w-full min-h-24 border-2 border-dashed border-gray-300 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3 p-3 sm:p-4 cursor-pointer hover:border-blue-400 transition"
-      >
-        <div className="flex items-center gap-3">
-          <span className="material-icons">image</span>
-          <div>
-            <div className="text-sm font-medium">اسحب وأفلت الصورة هنا</div>
-            <div className="text-xs text-gray-500">
-              أو انقر للاختيار (PNG, JPG, WEBP)
-            </div>
-          </div>
-        </div>
-        <input
-          id="prod-image-input"
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          onChange={(e) => onFileChange?.(e.target.files?.[0] || null)}
-          className="hidden"
-        />
-        <button
-          type="button"
-          className="inline-flex items-center gap-2 px-3 h-10 rounded-lg bg-blue-600 text-white"
-        >
-          <span className="material-icons text-[18px]">upload</span>
-          اختر ملفًا
-        </button>
-      </label>
+      <MyDropzone onFileChange={onFileChange} />
 
-      {/* معاينة */}
-      {file && (
+      {/* عرض المعاينة إذا لم يتم طلب إخفائها */}
+      {file && !hidePreview && (
         <div className="mt-3">
           <img
             src={URL.createObjectURL(file)}

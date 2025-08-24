@@ -11,10 +11,11 @@ import MyOrders from "./features/orders/pages/MyOrders.jsx";
 import OrderDetails from "./features/orders/pages/OrderDetails.jsx";
 import DistributorCatalog from "./features/orders/pages/DistributorCatalog.jsx";
 import Unauthorized from "./app/router/Unauthorized.jsx";
+import ProductDetails from "./features/products/pages/ProductDetails.jsx";
 
 export default function App() {
   return (
-    <div className="h-screen bg-gray-50 text-gray-900">
+    <div className="min-h-screen bg-gray-50 text-gray-900">
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/set-password" element={<SetPassword />} />
@@ -38,6 +39,10 @@ export default function App() {
             <Route path="/distributor/cart" element={<CartEditor />} />
             <Route path="/distributor/orders" element={<MyOrders />} />
             <Route path="/distributor/orders/:id" element={<OrderDetails />} />
+            <Route
+              path="/distributor/products/:id"
+              element={<ProductDetails />}
+            />
           </Route>
         </Route>
 

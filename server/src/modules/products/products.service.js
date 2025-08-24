@@ -10,23 +10,22 @@ export async function list({
   includeArchived,
   page,
   limit,
+  sort,
   user,
 } = {}) {
-  const qb = db("products")
-    .select(
-      "id",
-      "name",
-      "sku",
-      "price",
-      "unit",
-      "category_id",
-      "image_url",
-      "thumb_url",
-      "description",
-      "active",
-      "archived_at"
-    )
-    .orderBy("name");
+  const qb = db("products").select(
+    "id",
+    "name",
+    "sku",
+    "price",
+    "unit",
+    "category_id",
+    "image_url",
+    "thumb_url",
+    "description",
+    "active",
+    "archived_at"
+  );
 
   const isAdmin = user?.role === "admin";
 
@@ -56,6 +55,29 @@ export async function list({
     });
   }
 
+  switch (String(sort || "").toLowerCase()) {
+    case "latest":
+      // الأحدث: حسب تاريخ/معرّف الإدخال
+      qb.orderBy("id", "desc");
+      break;
+    case "price_asc":
+      qb.orderBy([
+        { column: "price", order: "asc" },
+        { column: "name", order: "asc" },
+      ]);
+      break;
+    case "price_desc":
+      qb.orderBy([
+        { column: "price", order: "desc" },
+        { column: "name", order: "asc" },
+      ]);
+      break;
+    case "name":
+      qb.orderBy("name", "asc");
+      break;
+    default:
+      qb.orderBy("name", "asc");
+  }
   const take = Number(limit) > 0 ? Number(limit) : null;
   const pageNum = Number(page) > 0 ? Number(page) : 1;
   if (take) qb.limit(take).offset((pageNum - 1) * take);
@@ -140,4 +162,34 @@ export async function attachImage(id, filePath) {
 
   await repoSetImage(id, { image_url, thumb_url: null });
   return { image_url, thumb_url: null };
+}
+
+export async function getById(id, { user } = {}) {
+  const row = await db("products as p")
+    .leftJoin("categories as c", "c.id", "p.category_id")
+    .select(
+      "p.id",
+      "p.name",
+      "p.sku",
+      "p.price",
+      "p.unit",
+      "p.category_id",
+      "p.image_url",
+      "p.thumb_url",
+      "p.description",
+      "p.active",
+      "p.archived_at",
+      db.raw("COALESCE(c.name, '') as category_name")
+    )
+    .where("p.id", Number(id))
+    .first();
+
+  if (!row) return null;
+
+  // الموزّع لا يرى غير الفعال/المؤرشف
+  const isAdmin = user?.role === "admin";
+  if (!isAdmin && (row.active !== 1 || row.archived_at)) {
+    return null;
+  }
+  return row;
 }

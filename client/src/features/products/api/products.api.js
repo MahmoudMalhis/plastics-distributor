@@ -25,11 +25,10 @@ export async function searchProducts({
   sort = "latest",
 } = {}) {
   const params = {
-    q,
-    categoryId,
-    category_id: categoryId,
+    search: q || undefined, // 👈 الباك يقرأها search
+    categoryId: categoryId || undefined,
     page,
-    pageSize,
+    limit: pageSize, // 👈 الباك يقرأها limit
     sort,
   };
   Object.keys(params).forEach(
@@ -74,4 +73,9 @@ export async function listCategories() {
   const { data } = await api.get("/api/categories");
   if (Array.isArray(data)) return { rows: data };
   return data || { rows: [] };
+}
+
+export async function getProductById(id) {
+  const { data } = await api.get(`/api/products/${id}`);
+  return data; // نتوقع كائن المنتج مباشرة
 }

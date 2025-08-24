@@ -5,7 +5,10 @@ import {
   listCategories,
   imageUrl,
 } from "../../products/api/products.api";
-import { useCart, addItem } from "../state/cart.store";
+import { addItem, useCart } from "../state/cart.store";
+import QuantityInput from "../../../components/ui/QuantityInput";
+import PageHeader from "../../../components/ui/PageHeader";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function DistributorCatalog() {
   const [q, setQ] = useState("");
@@ -22,13 +25,8 @@ export default function DistributorCatalog() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const { totals } = useCart();
-
-  const Title = ({ children }) => (
-    <h2 className="text-[#0d141c] text-[28px] font-bold leading-tight px-4 text-center pb-3 pt-5">
-      {children}
-    </h2>
-  );
+  const navigate = useNavigate();
+  const { items: item } = useCart();
 
   useEffect(() => {
     let cancelled = false;
@@ -88,18 +86,25 @@ export default function DistributorCatalog() {
       style={{ fontFamily: '"Public Sans","Noto Sans",sans-serif' }}
     >
       <div className="max-w-6xl mx-auto py-5">
-        <div className="flex items-center justify-between px-4">
-          <Title>كتالوج المنتجات</Title>
-          <div className="text-sm text-[#49739c]">
-            السلة: {totals.count} قطعة
-          </div>
-        </div>
+        <PageHeader title="كاتالوج المنتجات">
+          <button
+            className="relative inline-flex items-center justify-center bg-blue-600 text-white font-bold py-2.5 px-4 sm:px-5 rounded-lg shadow-md hover:bg-blue-700 transition cursor-pointer"
+            onClick={() => navigate("/distributor/cart")}
+          >
+            <span className="material-icons text-base sm:text-[20px]">
+              shopping_cart
+            </span>
+            <span className="absolute bg-red-500 rounded-full w-7 h-7 -top-2 -right-2">
+              {item.length}
+            </span>
+          </button>
+        </PageHeader>
 
         {/* شريط أدوات */}
         <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 px-4 mt-2">
+          <div className="flex md:flex-row flex-col gap-3 px-4 mt-2">
             {/* البحث */}
-            <label className="flex items-stretch rounded-lg col-span-2">
+            <label className="flex items-stretch rounded-lg col-span-2 basis-1/2">
               <div className="text-[#49739c] flex border border-[#cedbe8] bg-slate-50 items-center justify-center pr-[15px] rounded-r-lg border-l-0 px-2">
                 {/* أيقونة بحث */}
                 <svg
@@ -125,7 +130,7 @@ export default function DistributorCatalog() {
             </label>
 
             {/* التصنيف */}
-            <label className="flex items-stretch rounded-lg">
+            <label className="flex items-stretch rounded-lg basis-1/4">
               <div className="text-[#49739c] flex border border-[#cedbe8] bg-slate-50 items-center justify-center pr-[15px] rounded-r-lg border-l-0 px-2">
                 تصنيف
               </div>
@@ -169,7 +174,7 @@ export default function DistributorCatalog() {
         </div>
 
         {/* الشبكة */}
-        <div className="px-4 mt-4">
+        <div className="mt-4">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-3 text-sm">
               {error}
@@ -183,9 +188,13 @@ export default function DistributorCatalog() {
               لا توجد نتائج مطابقة
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {items.map((p) => (
-                <ProductCard key={p.id} p={p} onAdd={() => addItem(p, 1)} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+              {items.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onAdd={(qty) => addItem(product, qty)}
+                />
               ))}
             </div>
           )}
@@ -203,41 +212,49 @@ export default function DistributorCatalog() {
   );
 }
 
-function ProductCard({ p, onAdd }) {
-  const img = p.image_url ? imageUrl(`${"/" + p.image_url}`) : null;
+function ProductCard({ product, onAdd }) {
+  const [qty, setQty] = useState(1);
+  const img = product.image_url ? imageUrl(product.image_url) : null;
   return (
     <div className="bg-white border border-[#cedbe8] rounded-xl overflow-hidden flex flex-col shadow-xl">
-      <div className="relative aspect-[4/3] bg-slate-100">
-        {img ? (
-          <img src={img} alt={p.name} className="w-full h-48 object-cover" />
-        ) : (
-          <div className="w-full h-full grid place-items-center text-[#49739c] text-sm">
-            لا توجد صورة
-          </div>
-        )}
+      <div className="relative aspect-[4/3] bg-slate-100 h-48">
+        <Link to={`/distributor/products/${product.id}`}>
+          {img ? (
+            <img
+              src={img}
+              alt={product.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full grid place-items-center text-[#49739c] text-sm">
+              لا توجد صورة
+            </div>
+          )}
+        </Link>
       </div>
       <div className="p-3 flex-1 flex flex-col gap-1">
         <div className="text-[#0d141c] font-bold leading-tight line-clamp-2">
-          {p.name}
+          {product.name}
         </div>
-        <div className="text-xs text-[#49739c]">SKU: {p.sku || "—"}</div>
-        {p.category_name && (
+        <div className="text-xs text-[#49739c]">SKU: {product.sku || "—"}</div>
+        {product.category_name && (
           <div className="text-xs text-[#49739c]">
-            التصنيف: {p.category_name}
+            التصنيف: {product.category_name}
           </div>
         )}
-        {p.price != null && (
+        {product.price != null && (
           <div className="mt-1 text-sm font-semibold text-[#0d141c]">
-            السعر: {Number(p.price).toLocaleString()} ₪
+            السعر: {Number(product.price).toLocaleString()} ₪
           </div>
         )}
       </div>
-      <div className="p-3 pt-0">
+      <div className="flex justify-between p-3 pt-0">
+        <QuantityInput value={qty} onChange={setQty} min={1} />
         <button
-          className="w-full h-10 rounded-lg bg-[#0d80f2] text-white font-bold text-sm disabled:opacity-60"
-          onClick={onAdd}
+          className="h-10 rounded-lg bg-[#0d80f2] text-white font-bold text-sm disabled:opacity-60 p-3 cursor-pointer"
+          onClick={() => onAdd(qty)}
         >
-          أضف للسلة
+          <span className="material-icons">add_shopping_cart</span>
         </button>
       </div>
     </div>

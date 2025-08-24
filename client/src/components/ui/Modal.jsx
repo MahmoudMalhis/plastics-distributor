@@ -7,25 +7,29 @@ export default function Modal({ open, title, onClose, children, footer }) {
       aria-modal="true"
     >
       <div
-        className="w-full max-w-2xl bg-white rounded-xl shadow-xl overflow-hidden"
+        className="w-full max-w-5xl bg-gray-50 rounded-xl shadow-xl overflow-hidden"
         dir="rtl"
       >
-        <div className="px-4 sm:px-5 py-3 border-b flex items-center justify-between bg-white">
-          <h3 className="text-lg sm:text-xl font-bold">{title}</h3>
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center cursor-pointer"
-            type="button"
-          >
-            <span className="material-icons">close</span>
-          </button>
+        <div className="p-4 md:p-8">
+          {/* Header */}
+          <header className="flex justify-between items-center pb-6 border-b border-gray-200 mb-8">
+            <h1 className="text-3xl font-bold text-gray-800">{title}</h1>
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-800 cursor-pointer"
+              type="button"
+            >
+              <span className="material-icons text-2xl">close</span>
+            </button>
+          </header>
+          <main>{children}</main>
+          {/* Footer */}
+          {footer && (
+            <footer className="pt-8 mt-8 border-t border-gray-200 flex justify-end items-center gap-3">
+              {footer}
+            </footer>
+          )}
         </div>
-        <div className="px-4 sm:px-5 py-4">{children}</div>
-        {footer && (
-          <div className="px-4 sm:px-5 py-3 border-t flex items-center justify-end gap-2">
-            {footer}
-          </div>
-        )}
       </div>
     </div>
   );

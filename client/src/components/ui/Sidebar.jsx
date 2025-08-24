@@ -71,7 +71,7 @@ export default function Sidebar() {
         onClick={toggleSidebar}
         aria-controls="admin-sidebar"
         aria-expanded={open}
-        className="md:hidden z-50 mt-5 mr-10"
+        className="lg:hidden z-50 mt-5 mr-10"
       >
         <span className="material-icons ml-2 sm:ml-3 text-base sm:text-[20px]">
           menu
@@ -80,7 +80,7 @@ export default function Sidebar() {
       {open && (
         <div
           onClick={() => setOpen(false)}
-          className="md:hidden fixed inset-0 bg-black/40 z-40"
+          className="lg:hidden fixed inset-0 bg-black/40 z-40"
           aria-hidden="true"
         />
       )}
@@ -91,7 +91,7 @@ export default function Sidebar() {
           fixed inset-y-0 right-0 z-50 w-64 bg-white shadow-md
           transform transition-transform duration-300
           ${open ? "translate-x-0" : "translate-x-full"}
-          md:translate-x-0
+          lg:translate-x-0
         `}
         role="navigation"
       >

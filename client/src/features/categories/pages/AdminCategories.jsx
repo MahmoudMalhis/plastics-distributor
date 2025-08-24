@@ -169,7 +169,7 @@ export default function AdminCategories() {
               إلغاء
             </button>
             <button
-              form="distributor-form"
+              form="category-form"
               type="submit"
               disabled={saving}
               className="inline-flex items-center gap-2 px-4 h-11 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-60 cursor-pointer"

@@ -5,7 +5,7 @@ export default function Layout() {
   return (
     <div className="">
       <Sidebar />
-      <main className="md:w-[calc(100%-16rem)] md:mr-auto p-10">
+      <main className="lg:w-[calc(100%-16rem)] lg:mr-auto p-10">
         <Outlet />
       </main>
     </div>

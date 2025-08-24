@@ -1,5 +1,6 @@
 // client/src/features/orders/state/cart.store.js
 import { useSyncExternalStore } from "react";
+import { notify } from "../../../utils/alerts";
 
 const LS_KEY = "cart";
 
@@ -54,15 +55,17 @@ export function addItem(product, qty = 1) {
   const i = items.findIndex((x) => x.productId === id);
   if (i >= 0) {
     items[i] = { ...items[i], qty: items[i].qty + qty };
+    notify("success", "تم تحديث الكمية في السلة");
   } else {
     items.push({
       productId: id,
       name: p.name || p.title || "",
       price: Number(p.price ?? 0),
-      image: p.image || null,
+      image: p.image_url || p.image || null,
       sku: p.sku || null,
       qty: qty,
     });
+    notify("success", "تمت اضافة المنتج الى السلة");
   }
   setState({ items });
 }
@@ -93,7 +96,7 @@ export function cartTotals() {
 }
 
 export function useCart() {
-  const snapshot = useSyncExternalStore(subscribe, getState, getState);
+  const snapshot = useSyncExternalStore(subscribe, getState);
   const totals = cartTotals();
   return {
     items: snapshot.items,
