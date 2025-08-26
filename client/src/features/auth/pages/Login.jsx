@@ -335,11 +335,6 @@ export default function Login() {
             </form>
           </>
         )}
-
-        {/* Forgot password (اختياري) */}
-        <p className="text-[#49739c] text-sm leading-normal pb-3 pt-1 px-4 text-center underline cursor-pointer">
-          نسيت كلمة المرور؟
-        </p>
       </div>
     </div>
   );

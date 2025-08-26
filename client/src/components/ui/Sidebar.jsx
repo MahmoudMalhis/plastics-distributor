@@ -55,6 +55,12 @@ export default function Sidebar() {
       icon: "receipt",
       role: "distributor",
     },
+    {
+      to: "/customers",
+      label: "العملاء",
+      icon: "groups",
+      role: "admin",
+    },
   ];
 
   const isActive = (to) => pathname === to;

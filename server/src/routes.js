@@ -3,12 +3,14 @@ import authRoutes from "./modules/auth/auth.routes.js";
 import categoriesRoutes from "./modules/categories/categories.routes.js";
 import productsRoutes from "./modules/products/products.routes.js";
 import distributorsRoutes from "./modules/distributors/distributors.routes.js";
+import customersRoutes from "./modules/customers/customers.routes.js";
 
-const r = Router();
+const router = Router();
 
-r.use("/auth", authRoutes);
-r.use("/categories", categoriesRoutes);
-r.use("/products", productsRoutes);
-r.use("/distributors", distributorsRoutes);
+router.use("/auth", authRoutes);
+router.use("/categories", categoriesRoutes);
+router.use("/products", productsRoutes);
+router.use("/distributors", distributorsRoutes);
+router.use("/customers", customersRoutes);
 
-export default r;
+export default router;

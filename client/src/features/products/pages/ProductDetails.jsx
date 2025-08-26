@@ -120,12 +120,12 @@ export default function ProductDetails() {
       style={{ fontFamily: '"Public Sans","Noto Sans",sans-serif' }}
     >
       <PageHeader title="تفاصيل المنتج">
-        <Link
-          to="/distributor/catalog"
-          className="text-sm underline text-[#49739c]"
+        <button
+          className="relative inline-flex items-center justify-center bg-blue-600 text-white font-bold py-2.5 px-4 sm:px-5 rounded-lg shadow-md hover:bg-blue-700 transition cursor-pointer"
+          onClick={() => navigate("/distributor/catalog")}
         >
           <span className="material-icons">keyboard_backspace</span>
-        </Link>
+        </button>
       </PageHeader>
 
       <div className="max-w-6xl mx-auto py-5">
@@ -171,19 +171,21 @@ export default function ProductDetails() {
                 </div>
               )}
 
-              <div className="flex gap-3 p-3 pt-0">
-                <QuantityInput
-                  value={qty}
-                  onChange={setQty}
-                  min={1}
-                  className=""
-                />
-                <button
-                  className="h-10 rounded-lg bg-[#0d80f2] text-white font-bold text-sm disabled:opacity-60 p-3 cursor-pointer"
-                  onClick={() => addItem(product, qty)}
-                >
-                  <span className="material-icons">add_shopping_cart</span>
-                </button>
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-3">
+                  <QuantityInput
+                    value={qty}
+                    onChange={setQty}
+                    min={1}
+                    className=""
+                  />
+                  <button
+                    className="h-10 rounded-lg bg-[#0d80f2] text-white font-bold text-sm disabled:opacity-60 p-3 cursor-pointer"
+                    onClick={() => addItem(product, qty)}
+                  >
+                    <span className="material-icons">add_shopping_cart</span>
+                  </button>
+                </div>
 
                 {product.description && (
                   <div className="text-[#0d141c] text-sm leading-relaxed">

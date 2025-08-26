@@ -116,3 +116,10 @@ export async function insertPasswordSetToken({
   const id = Array.isArray(inserted) ? inserted[0] : inserted;
   return knex("password_set_tokens").where({ id }).first();
 }
+
+export async function setUsersActiveByDistributor(distributorId, active) {
+  const newValue = !!active;
+  await knex("users")
+    .where({ distributor_id: distributorId })
+    .update({ active: newValue });
+}

@@ -96,10 +96,7 @@ export default function AdminCategories() {
       setItems((prev) => prev.filter((c) => c.id !== id));
       notify("success", "تم حذف التصنيف بنجاح");
     } catch (e) {
-      notify(
-        "warning",
-        e?.response?.data?.error || "تعذر حذف التصنيف. قد يكون مرتبطًا بمنتجات."
-      );
+      notify("warning", "تعذر حذف التصنيف. قد يكون مرتبطًا بمنتجات.");
     }
   }
 

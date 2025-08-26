@@ -34,11 +34,8 @@ export default function DistributorsList() {
       setLoading(true);
       setErr("");
       const rows = await listDistributor({ search });
-      const normalized = (Array.isArray(rows) ? rows : []).map((row) => ({
-        ...row,
-        active: row.active === 1 || row.active === true, // ← صارت Boolean
-      }));
-      setItems(normalized);
+      setItems(rows);
+      console.log(rows);
     } catch (error) {
       setErr(error?.response?.data?.error || "فشل جلب الموردين");
     } finally {
@@ -155,7 +152,7 @@ export default function DistributorsList() {
 
   return (
     <>
-      <PageHeader title="قائمة الموردين">
+      <PageHeader title="قائمة الموزعين">
         <button
           onClick={openCreate}
           className="inline-flex items-center justify-center bg-blue-600 text-white font-bold py-2.5 px-4 sm:px-5 rounded-lg shadow-md hover:bg-blue-700 transition cursor-pointer"

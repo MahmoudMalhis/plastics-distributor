@@ -1,0 +1,86 @@
+import db from "../../db/knex.js";
+
+// البحث أو جلب العملاء مع دعم التصفية والصفحات
+export async function list({ search, page, limit } = {}) {
+  const qb = db("customers as c").select(
+    "c.id",
+    "c.name",
+    "c.customer_sku",
+    "c.phone",
+    "c.address",
+    "c.notes",
+    "c.active",
+    "c.created_at"
+  );
+  if (search) {
+    const term = String(search).toLowerCase();
+    const like = `%${term.replace(/[%_]/g, "\\$&")}%`;
+    qb.where((q) => {
+      q.whereRaw("LOWER(c.name) LIKE ?", [like]).orWhereRaw(
+        "LOWER(c.customer_sku) LIKE ?",
+        [like]
+      );
+    });
+  }
+  qb.orderBy("c.name", "asc");
+  const take = Number(limit) > 0 ? Number(limit) : null;
+  const pageNum = Number(page) > 0 ? Number(page) : 1;
+  if (take) {
+    qb.limit(take).offset((pageNum - 1) * take);
+  }
+  return qb;
+}
+
+// إنشاء عميل جديد
+export async function create(dto) {
+  const inserted = await db("customers").insert(dto);
+  const raw = Array.isArray(inserted) ? inserted[0] : inserted;
+  const id = typeof raw === "object" ? raw.insertId ?? raw.id : Number(raw);
+  return db("customers").where({ id }).first();
+}
+
+// تحديث عميل
+export async function update(id, patch) {
+  await db("customers").where({ id }).update(patch);
+  return db("customers").where({ id }).first();
+}
+
+// إرجاع معلومات تفصيلية للعميل (عدد الطلبات والرصيد)
+export async function getDetails(id) {
+  const customer = await db("customers as c")
+    .select(
+      "c.id",
+      "c.name",
+      "c.customer_sku",
+      "c.phone",
+      "c.address",
+      "c.notes",
+      "c.active",
+      "c.created_at"
+    )
+    .where("c.id", id)
+    .first();
+  if (!customer) return null;
+
+  const orderCountRow = await db("orders")
+    .where({ customer_id: id })
+    .count({ count: "id" })
+    .first();
+  const ordersCount = Number(orderCountRow?.count ?? 0);
+
+  const ledgerRow = await db("ledger_entries")
+    .where({ customer_id: id })
+    .sum({ debit: "debit" })
+    .sum({ credit: "credit" })
+    .first();
+  const debit = Number(ledgerRow?.debit ?? 0);
+  const credit = Number(ledgerRow?.credit ?? 0);
+  const balance = debit - credit;
+
+  const orders = await db("orders")
+    .select("id", "code", "status", "total", "created_at")
+    .where({ customer_id: id })
+    .orderBy("created_at", "desc");
+
+  return { ...customer, ordersCount, balance, orders };
+}

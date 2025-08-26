@@ -5,10 +5,11 @@ import {
   listCategories,
   imageUrl,
 } from "../../products/api/products.api";
-import { addItem, useCart } from "../state/cart.store";
+import { addItem, useCart, setCustomer } from "../state/cart.store";
 import QuantityInput from "../../../components/ui/QuantityInput";
 import PageHeader from "../../../components/ui/PageHeader";
 import { Link, useNavigate } from "react-router-dom";
+import CustomerSelect from "../../customers/components/CustomerSelect";
 
 export default function DistributorCatalog() {
   const [q, setQ] = useState("");
@@ -26,7 +27,9 @@ export default function DistributorCatalog() {
   const [error, setError] = useState("");
 
   const navigate = useNavigate();
-  const { items: item } = useCart();
+  const { items: item, customer } = useCart();
+
+  // داخل رسم بطاقة المنتج
 
   useEffect(() => {
     let cancelled = false;
@@ -81,143 +84,171 @@ export default function DistributorCatalog() {
   );
 
   return (
-    <div
-      className="relative min-h-screen bg-slate-50 overflow-x-hidden"
-      style={{ fontFamily: '"Public Sans","Noto Sans",sans-serif' }}
-    >
-      <div className="max-w-6xl mx-auto py-5">
-        <PageHeader title="كاتالوج المنتجات">
-          <button
-            className="relative inline-flex items-center justify-center bg-blue-600 text-white font-bold py-2.5 px-4 sm:px-5 rounded-lg shadow-md hover:bg-blue-700 transition cursor-pointer"
-            onClick={() => navigate("/distributor/cart")}
-          >
-            <span className="material-icons text-base sm:text-[20px]">
-              shopping_cart
-            </span>
-            <span className="absolute bg-red-500 rounded-full w-7 h-7 -top-2 -right-2">
-              {item.length}
-            </span>
-          </button>
-        </PageHeader>
+    <>
+      <PageHeader title="كاتالوج المنتجات">
+        <button
+          className="relative inline-flex items-center justify-center bg-blue-600 text-white font-bold py-2.5 px-4 sm:px-5 rounded-lg shadow-md hover:bg-blue-700 transition cursor-pointer"
+          onClick={() => navigate("/distributor/cart")}
+        >
+          <span className="material-icons text-base sm:text-[20px]">
+            shopping_cart
+          </span>
+          <span className="absolute bg-red-500 rounded-full w-7 h-7 -top-2 -right-2">
+            {item.length}
+          </span>
+        </button>
+      </PageHeader>
 
-        {/* شريط أدوات */}
-        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-6">
-          <div className="flex md:flex-row flex-col gap-3 px-4 mt-2">
-            {/* البحث */}
-            <label className="flex items-stretch rounded-lg col-span-2 basis-1/2">
-              <div className="text-[#49739c] flex border border-[#cedbe8] bg-slate-50 items-center justify-center pr-[15px] rounded-r-lg border-l-0 px-2">
-                {/* أيقونة بحث */}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  fill="currentColor"
-                  viewBox="0 0 256 256"
-                >
-                  <path d="M229.66,218.34l-50.91-50.91a88.11,88.11,0,1,0-11.31,11.31l50.91,50.91a8,8,0,0,0,11.31-11.31ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z" />
-                </svg>
-              </div>
-              <input
-                dir="rtl"
-                value={q}
-                onChange={(e) => {
-                  setPage(1);
-                  setQ(e.target.value);
-                }}
-                placeholder="ابحث باسم المنتج أو الكود أو الوصف"
-                className="flex w-full min-w-0 flex-1 rounded-lg text-[#0d141c] border border-[#cedbe8] bg-slate-50 h-12 placeholder:text-[#49739c] p-[12px] rounded-r-none border-r-0 pr-2 text-base focus:outline-none"
-              />
-            </label>
-
-            {/* التصنيف */}
-            <label className="flex items-stretch rounded-lg basis-1/4">
-              <div className="text-[#49739c] flex border border-[#cedbe8] bg-slate-50 items-center justify-center pr-[15px] rounded-r-lg border-l-0 px-2">
-                تصنيف
-              </div>
-              <select
-                value={categoryId}
-                onChange={(e) => {
-                  setPage(1);
-                  setCategoryId(e.target.value);
-                }}
-                className="flex w-full min-w-0 flex-1 rounded-lg text-[#0d141c] border border-[#cedbe8] bg-slate-50 h-12 p-[12px] rounded-r-none border-r-0 pr-2 text-base focus:outline-none"
+      {/* شريط أدوات */}
+      <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-6">
+        <div className="flex md:flex-row flex-col gap-3 px-4 mt-2">
+          {/* البحث */}
+          <label className="flex items-stretch rounded-lg col-span-2 basis-1/2">
+            <div className="text-[#49739c] flex border border-[#cedbe8] bg-slate-50 items-center justify-center pr-[15px] rounded-r-lg border-l-0 px-2">
+              {/* أيقونة بحث */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                fill="currentColor"
+                viewBox="0 0 256 256"
               >
-                <option value="">جميع التصنيفات</option>
-                {cats.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <path d="M229.66,218.34l-50.91-50.91a88.11,88.11,0,1,0-11.31,11.31l50.91,50.91a8,8,0,0,0,11.31-11.31ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z" />
+              </svg>
+            </div>
+            <input
+              dir="rtl"
+              value={q}
+              onChange={(e) => {
+                setPage(1);
+                setQ(e.target.value);
+              }}
+              placeholder="ابحث باسم المنتج أو الكود أو الوصف"
+              className="flex w-full min-w-0 flex-1 rounded-lg text-[#0d141c] border border-[#cedbe8] bg-slate-50 h-12 placeholder:text-[#49739c] p-[12px] rounded-r-none border-r-0 pr-2 text-base focus:outline-none"
+            />
+          </label>
 
-            {/* الترتيب */}
-            <label className="flex items-stretch rounded-lg">
-              <div className="text-[#49739c] flex border border-[#cedbe8] bg-slate-50 items-center justify-center pr-[15px] rounded-r-lg border-l-0 px-2">
-                ترتيب
-              </div>
-              <select
-                value={sort}
-                onChange={(e) => {
-                  setPage(1);
-                  setSort(e.target.value);
-                }}
-                className="flex w-full min-w-0 flex-1 rounded-lg text-[#0d141c] border border-[#cedbe8] bg-slate-50 h-12 p-[12px] rounded-r-none border-r-0 pr-2 text-base focus:outline-none"
-              >
-                <option value="latest">الأحدث</option>
-                <option value="price_asc">السعر: من الأقل للأعلى</option>
-                <option value="price_desc">السعر: من الأعلى للأقل</option>
-                <option value="name">الاسم</option>
-              </select>
-            </label>
+          <div className="basis-1/4 min-w-[220px]">
+            <CustomerSelect
+              selected={customer}
+              onSelect={(c) => setCustomer(c)}
+              onCreateNew={() => navigate("/customers/new")}
+            />
           </div>
-        </div>
 
-        {/* الشبكة */}
-        <div className="mt-4">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-3 text-sm">
-              {error}
+          {/* التصنيف */}
+          <label className="flex items-stretch rounded-lg basis-1/4">
+            <div className="text-[#49739c] flex border border-[#cedbe8] bg-slate-50 items-center justify-center pr-[15px] rounded-r-lg border-l-0 px-2">
+              تصنيف
             </div>
-          )}
-
-          {loading ? (
-            <SkeletonGrid count={12} />
-          ) : items.length === 0 ? (
-            <div className="text-center text-[#49739c] py-10">
-              لا توجد نتائج مطابقة
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-              {items.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onAdd={(qty) => addItem(product, qty)}
-                />
+            <select
+              value={categoryId}
+              onChange={(e) => {
+                setPage(1);
+                setCategoryId(e.target.value);
+              }}
+              className="flex w-full min-w-0 flex-1 rounded-lg text-[#0d141c] border border-[#cedbe8] bg-slate-50 h-12 p-[12px] rounded-r-none border-r-0 pr-2 text-base focus:outline-none"
+            >
+              <option value="">جميع التصنيفات</option>
+              {cats.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
               ))}
-            </div>
-          )}
+            </select>
+          </label>
 
-          <Pager
-            page={page}
-            pages={pages}
-            loading={loading}
-            onPrev={() => setPage((n) => Math.max(1, n - 1))}
-            onNext={() => setPage((n) => Math.min(pages, n + 1))}
-          />
+          {/* الترتيب */}
+          <label className="flex items-stretch rounded-lg">
+            <div className="text-[#49739c] flex border border-[#cedbe8] bg-slate-50 items-center justify-center pr-[15px] rounded-r-lg border-l-0 px-2">
+              ترتيب
+            </div>
+            <select
+              value={sort}
+              onChange={(e) => {
+                setPage(1);
+                setSort(e.target.value);
+              }}
+              className="flex w-full min-w-0 flex-1 rounded-lg text-[#0d141c] border border-[#cedbe8] bg-slate-50 h-12 p-[12px] rounded-r-none border-r-0 pr-2 text-base focus:outline-none"
+            >
+              <option value="latest">الأحدث</option>
+              <option value="price_asc">السعر: من الأقل للأعلى</option>
+              <option value="price_desc">السعر: من الأعلى للأقل</option>
+              <option value="name">الاسم</option>
+            </select>
+          </label>
         </div>
       </div>
-    </div>
+
+      {/* الشبكة */}
+      <div className="mt-4">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-3 text-sm">
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <SkeletonGrid count={12} />
+        ) : items.length === 0 ? (
+          <div className="text-center text-[#49739c] py-10">
+            لا توجد نتائج مطابقة
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+            {items.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onAdd={(qty) => addItem(product, qty)}
+              />
+            ))}
+          </div>
+        )}
+
+        <Pager
+          page={page}
+          pages={pages}
+          loading={loading}
+          onPrev={() => setPage((n) => Math.max(1, n - 1))}
+          onNext={() => setPage((n) => Math.min(pages, n + 1))}
+        />
+      </div>
+    </>
   );
 }
 
 function ProductCard({ product, onAdd }) {
   const [qty, setQty] = useState(1);
   const img = product.image_url ? imageUrl(product.image_url) : null;
+  const { items: cartItems, removeItem } = useCart();
+  const cartIds = useMemo(
+    () => new Set(cartItems.map((item) => String(item.productId))),
+    [cartItems]
+  );
+
+  const inCart = cartIds.has(String(product.id));
+
+  const handleClick = () => {
+    if (inCart) {
+      removeItem(product.id); // ✅ يشيل المنتج
+    } else {
+      onAdd(qty); // ➕ يضيف المنتج
+    }
+  };
+
   return (
-    <div className="bg-white border border-[#cedbe8] rounded-xl overflow-hidden flex flex-col shadow-xl">
+    <div
+      className={`${
+        inCart ? "border-2 border-green-500 " : "opacity-100"
+      } border-[#cedbe8] rounded-xl overflow-hidden flex flex-col shadow-xl`}
+    >
       <div className="relative aspect-[4/3] bg-slate-100 h-48">
+        {inCart && (
+          <div className="absolute top-2 right-2 w-10 h-10 bg-green-500 text-white rounded-full p-2">
+            <span className="material-icons">check</span>
+          </div>
+        )}
         <Link to={`/distributor/products/${product.id}`}>
           {img ? (
             <img
@@ -250,12 +281,23 @@ function ProductCard({ product, onAdd }) {
       </div>
       <div className="flex justify-between p-3 pt-0">
         <QuantityInput value={qty} onChange={setQty} min={1} />
-        <button
-          className="h-10 rounded-lg bg-[#0d80f2] text-white font-bold text-sm disabled:opacity-60 p-3 cursor-pointer"
-          onClick={() => onAdd(qty)}
-        >
-          <span className="material-icons">add_shopping_cart</span>
-        </button>
+        {inCart ? (
+          <button
+            className="flex justify-center items-center h-10 rounded-lg bg-green-500 text-white font-bold text-sm disabled:opacity-60 p-3 cursor-pointer"
+            onClick={handleClick}
+            title="أضف للسة"
+          >
+            <span className="material-icons">check</span>
+          </button>
+        ) : (
+          <button
+            className="h-10 rounded-lg bg-[#0d80f2] text-white font-bold text-sm disabled:opacity-60 p-3 cursor-pointer"
+            onClick={handleClick}
+            title="إزالة من السلة"
+          >
+            <span className="material-icons">add_shopping_cart</span>
+          </button>
+        )}
       </div>
     </div>
   );

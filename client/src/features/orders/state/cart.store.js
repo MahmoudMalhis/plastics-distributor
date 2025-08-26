@@ -7,10 +7,12 @@ const LS_KEY = "cart";
 function load() {
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return { items: [] };
+    if (!raw) return { items: [], customer: null };
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed?.items)) return { items: [] };
-    return { items: parsed.items };
+    return {
+      items: Array.isArray(parsed?.items) ? parsed.items : [],
+      customer: parsed?.customer ?? null,
+    };
   } catch {
     return { items: [] };
   }
@@ -95,15 +97,29 @@ export function cartTotals() {
   return { subtotal, count };
 }
 
+export function setCustomer(cust) {
+  const customer = cust
+    ? { id: cust.id, name: cust.name, phone: cust.phone ?? null }
+    : null;
+  setState({ customer });
+}
+
+export function clearCustomer() {
+  setState({ customer: null });
+}
+
 export function useCart() {
   const snapshot = useSyncExternalStore(subscribe, getState);
   const totals = cartTotals();
   return {
     items: snapshot.items,
+    customer: snapshot.customer,
     totals,
     addItem,
     removeItem,
     setQty,
     clearCart,
+    setCustomer,
+    clearCustomer,
   };
 }

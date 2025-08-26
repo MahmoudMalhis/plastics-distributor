@@ -5,8 +5,12 @@ import { randomPassword, randomToken } from "../../utils/password.js";
 import { buildWaText } from "../../utils/wa.js";
 
 // قائمة الموردين
-export function list({ search } = {}) {
-  return repo.search({ search });
+export async function list({ search } = {}) {
+  const rows = await repo.search({ search });
+  return rows.map((r) => ({
+    ...r,
+    active: !!r.active,
+  }));
 }
 
 // إنشاء مورد + مستخدم له
@@ -54,6 +58,7 @@ export async function update(id, { name, phone, address, notes, active }) {
   if (!distributor)
     throw Object.assign(new Error("الموزع غير موجود"), { status: 404 });
 
+  // حدّث بيانات الموزع في قاعدة البيانات
   const updated = await repo.updateDistributor(id, {
     name,
     phone,
@@ -62,12 +67,22 @@ export async function update(id, { name, phone, address, notes, active }) {
     active,
   });
 
-  // لو تم إيقافه → احذف refresh tokens + بث Socket.IO للمستخدمين
-  if (typeof active === "boolean" && active === false) {
+  // حوّل قيمة active إلى Boolean حقيقي أياً كان نوعها
+  let activeParsed;
+  if (active !== undefined && active !== null) {
+    if (typeof active === "boolean") activeParsed = active;
+    else if (typeof active === "number") activeParsed = active !== 0;
+    else if (typeof active === "string")
+      activeParsed = active === "1" || active.toLowerCase() === "true";
+    else activeParsed = !!active;
+  }
+
+  // عند التعطيل
+  if (activeParsed === false) {
     const userIds = await repo.getUserIdsByDistributor(id);
     if (userIds.length) {
       await repo.revokeRefreshTokensForUsers(userIds);
-      // بث رسالة فصل
+      await repo.setUsersActiveByDistributor(id, false);
       userIds.forEach((uid) => {
         io.to(`user:${uid}`).emit("account_disabled", {
           reason: "distributor_disabled",
@@ -76,7 +91,12 @@ export async function update(id, { name, phone, address, notes, active }) {
     }
   }
 
-  return updated;
+  // عند إعادة التفعيل
+  if (activeParsed === true) {
+    await repo.setUsersActiveByDistributor(id, true);
+  }
+
+  return { ...updated, active: !!updated.active };
 }
 
 // إنشاء توكن لمرة واحدة لتعيين كلمة المرور (للواتساب)

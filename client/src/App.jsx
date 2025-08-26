@@ -12,6 +12,8 @@ import OrderDetails from "./features/orders/pages/OrderDetails.jsx";
 import DistributorCatalog from "./features/orders/pages/DistributorCatalog.jsx";
 import Unauthorized from "./app/router/Unauthorized.jsx";
 import ProductDetails from "./features/products/pages/ProductDetails.jsx";
+import CustomersList from "./features/customers/pages/CustomersList.jsx";
+import CustomerProfile from "./features/customers/pages/CustomerProfile.jsx";
 
 export default function App() {
   return (
@@ -50,7 +52,10 @@ export default function App() {
         <Route
           element={<RequireAuth allowedRoles={["admin", "distributor"]} />}
         >
-          <Route element={<Layout />}>{/* أضف هنا أي صفحات مشتركة */}</Route>
+          <Route element={<Layout />}>
+            <Route path="/customers" element={<CustomersList />} />
+            <Route path="/customers/:id" element={<CustomerProfile />} />
+          </Route>
         </Route>
         <Route path="/unauthorized" element={<Unauthorized />} />
 
