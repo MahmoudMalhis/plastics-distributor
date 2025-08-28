@@ -53,15 +53,15 @@ export default function CustomerProfile() {
 
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50">
-      <PageHeader title={`ملف العميل: ${customer.name}`}>
-        <button
-          className="relative inline-flex items-center justify-center bg-blue-600 text-white font-bold py-2.5 px-4 sm:px-5 rounded-lg shadow-md hover:bg-blue-700 transition cursor-pointer"
-          onClick={() => navigate("/customers")}
-        >
-          <span className="material-icons">keyboard_backspace</span>
-        </button>
-      </PageHeader>
       <div className="max-w-6xl mx-auto py-5">
+        <PageHeader title={`ملف العميل: ${customer.name}`}>
+          <button
+            className="relative inline-flex items-center justify-center bg-blue-600 text-white font-bold py-2.5 px-4 sm:px-5 rounded-lg shadow-md hover:bg-blue-700 transition cursor-pointer"
+            onClick={() => navigate("/customers")}
+          >
+            <span className="material-icons">keyboard_backspace</span>
+          </button>
+        </PageHeader>
         {/* بيانات العميل */}
         <div className="bg-white border border-[#cedbe8] rounded-xl p-4 mb-6">
           <h3 className="text-xl font-bold mb-3">البيانات الأساسية</h3>
@@ -82,6 +82,23 @@ export default function CustomerProfile() {
                 customer.ordersCount != null
                   ? customer.ordersCount
                   : orders.length
+              }
+            />
+            <Info
+              label="الموقع"
+              value={
+                customer.latitude && customer.longitude ? (
+                  <a
+                    href={`https://www.google.com/maps?q=${customer.latitude},${customer.longitude}`}
+                    className="text-blue-600 underline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    فتح الخريطة
+                  </a>
+                ) : (
+                  "—"
+                )
               }
             />
           </div>

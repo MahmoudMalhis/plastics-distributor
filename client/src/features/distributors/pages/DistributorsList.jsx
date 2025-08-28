@@ -11,6 +11,7 @@ import {
   updateDistributor,
   issuePasswordToken,
   createDistributor,
+  uploadDistributorIdImage,
 } from "../api/distributors.api";
 import DistributorsForm from "../components/DistributorsForm";
 
@@ -24,9 +25,16 @@ export default function DistributorsList() {
     id: null,
     name: "",
     phone: "",
+    phone2: "",
     address: "",
     notes: "",
     username: "",
+    idImageFile: null,
+    vehicle_plate: "",
+    vehicle_type: "",
+    vehicle_model: "",
+    company_vehicle: false,
+    responsible_areas: "",
   });
 
   async function fetchDistributors() {
@@ -35,7 +43,6 @@ export default function DistributorsList() {
       setErr("");
       const rows = await listDistributor({ search });
       setItems(rows);
-      console.log(rows);
     } catch (error) {
       setErr(error?.response?.data?.error || "فشل جلب الموردين");
     } finally {
@@ -48,14 +55,41 @@ export default function DistributorsList() {
   }, [search]);
 
   function openCreate() {
-    setErr("");
     setForm({
       id: null,
       name: "",
       phone: "",
+      phone2: "",
       address: "",
       notes: "",
       username: "",
+      idImageFile: null,
+      vehicle_plate: "",
+      vehicle_type: "",
+      vehicle_model: "",
+      company_vehicle: false,
+      responsible_areas: "",
+    });
+    setOpen(true);
+  }
+
+  function openEdit(distributor) {
+    setForm({
+      id: distributor.id,
+      name: distributor.name || "",
+      phone: distributor.phone || "",
+      phone2: distributor.phone2 || "",
+      address: distributor.address || "",
+      notes: distributor.notes || "",
+      username: distributor.username || "",
+      idImageFile: null,
+      vehicle_plate: distributor.vehicle_plate || "",
+      vehicle_type: distributor.vehicle_type || "",
+      vehicle_model: distributor.vehicle_model || "",
+      company_vehicle:
+        distributor.company_vehicle === true ||
+        distributor.company_vehicle === 1,
+      responsible_areas: distributor.responsible_areas || "",
     });
     setOpen(true);
   }
@@ -113,38 +147,82 @@ export default function DistributorsList() {
     e.preventDefault();
     const name = (form.name || "").trim();
     if (!name) return;
+
     setLoading(true);
     setErr("");
+
     try {
       if (form.id) {
-        const data = await updateDistributor(form.id, {
+        // تحديث موزع موجود
+        const updated = await updateDistributor(form.id, {
           name,
           phone: form.phone,
+          phone2: form.phone2,
           address: form.address,
           notes: form.notes,
           username: form.username,
+          vehicle_plate: form.vehicle_plate,
+          vehicle_type: form.vehicle_type,
+          vehicle_model: form.vehicle_model,
+          company_vehicle: form.company_vehicle,
+          responsible_areas: form.responsible_areas,
         });
+
+        // إذا تم رفع صورة هوية جديدة
+        let finalDistributor = updated;
+        if (form.idImageFile) {
+          const resp = await uploadDistributorIdImage(
+            form.id,
+            form.idImageFile
+          );
+          finalDistributor = { ...updated, id_image_url: resp.id_image_url };
+        }
+
+        // تحديث قائمة العناصر
         setItems((prev) =>
           prev
-            .map((c) => (c.id === form.id ? data : c))
+            .map((d) => (d.id === form.id ? finalDistributor : d))
             .sort((a, b) => a.name.localeCompare(b.name, "ar"))
         );
       } else {
-        const data = await createDistributor({
+        // إنشاء موزع جديد
+        const result = await createDistributor({
           name,
           phone: form.phone,
+          phone2: form.phone2,
           address: form.address,
           notes: form.notes,
           username: form.username,
+          vehicle_plate: form.vehicle_plate,
+          vehicle_type: form.vehicle_type,
+          vehicle_model: form.vehicle_model,
+          company_vehicle: form.company_vehicle,
+          responsible_areas: form.responsible_areas,
         });
+
+        let newDist = result.distributor || result;
+
+        // رفع صورة الهوية إن وجدت
+        if (form.idImageFile) {
+          const resp = await uploadDistributorIdImage(
+            newDist.id,
+            form.idImageFile
+          );
+          newDist = { ...newDist, id_image_url: resp.id_image_url };
+        }
+
+        // إضافة العنصر الجديد للقائمة
         setItems((prev) =>
-          [...prev, data].sort((a, b) => a.name.localeCompare(b.name, "ar"))
+          [...prev, newDist].sort((a, b) => a.name.localeCompare(b.name, "ar"))
         );
       }
+
+      // إعادة تعيين النموذج وإغلاق النافذة
       setOpen(false);
       notify("success", "تم الحفظ بنجاح");
     } catch (error) {
-      setErr("error", error?.response?.data?.error || "فشل الحفظ");
+      setErr(error?.response?.data?.error || "فشل الحفظ");
+      notify("error", "فشل الحفظ");
     } finally {
       setLoading(false);
     }
@@ -201,6 +279,7 @@ export default function DistributorsList() {
               key={distributor.id}
               index={index}
               distributor={distributor}
+              onEdit={() => openEdit(distributor)}
               onSendPasswordLink={() => onSendPasswordLink(distributor)}
               onToggleActive={() => onToggleActive(distributor)}
             />

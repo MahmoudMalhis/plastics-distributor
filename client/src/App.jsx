@@ -14,6 +14,7 @@ import Unauthorized from "./app/router/Unauthorized.jsx";
 import ProductDetails from "./features/products/pages/ProductDetails.jsx";
 import CustomersList from "./features/customers/pages/CustomersList.jsx";
 import CustomerProfile from "./features/customers/pages/CustomerProfile.jsx";
+import DistributorProfile from "./features/distributors/pages/DistributorProfile.jsx";
 
 export default function App() {
   return (
@@ -28,6 +29,10 @@ export default function App() {
             <Route path="/admin/products" element={<AdminProducts />} />
             <Route path="/admin/categories" element={<AdminCategories />} />
             <Route path="/admin/distributors" element={<DistributorsList />} />
+            <Route
+              path="/admin/distributors/:id"
+              element={<DistributorProfile />}
+            />
           </Route>
         </Route>
 

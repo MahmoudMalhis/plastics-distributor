@@ -11,7 +11,7 @@ export async function list(req, res, next) {
 
 export async function create(req, res, next) {
   try {
-    const out = await svc.create(req.body);
+    const out = await svc.create(req.body, req.user);
     res.status(201).json(out);
   } catch (e) {
     next(e);
@@ -21,7 +21,10 @@ export async function create(req, res, next) {
 export async function update(req, res, next) {
   try {
     const id = Number(req.params.id);
-    const out = await svc.update(id, req.body);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ error: "id غير صالح" });
+    }
+    const out = await svc.update(id, req.body, req.user);
     res.json(out);
   } catch (e) {
     next(e);

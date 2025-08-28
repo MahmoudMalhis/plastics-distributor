@@ -10,6 +10,11 @@ function cleanObject(object) {
   );
 }
 
+export async function getDistributor(id) {
+  const response = await api.get(`/api/distributors/${id}`);
+  return response.data;
+}
+
 /** جلب الموردين مع فلاتر اختيارية */
 export async function listDistributor({ search, page, limit } = {}) {
   const params = cleanObject({ search, page, limit });
@@ -22,13 +27,33 @@ export async function listDistributor({ search, page, limit } = {}) {
 export async function createDistributor({
   name,
   phone,
+  phone2,
   address,
   notes,
   username,
+  id_image_url,
+  vehicle_plate,
+  vehicle_type,
+  vehicle_model,
+  company_vehicle,
+  responsible_areas,
 }) {
   const response = await api.post(
     "/api/distributors",
-    cleanObject({ name, phone, address, notes, username })
+    cleanObject({
+      name,
+      phone,
+      phone2,
+      address,
+      notes,
+      username,
+      id_image_url,
+      vehicle_plate,
+      vehicle_type,
+      vehicle_model,
+      company_vehicle,
+      responsible_areas,
+    })
   );
   return response.data; // { distributors, user, tempPassword }
 }
@@ -36,13 +61,56 @@ export async function createDistributor({
 /** تعديل بيانات مورد (يدعم التفعيل/الإيقاف عبر active) */
 export async function updateDistributor(
   distributorsId,
-  { name, phone, address, notes, username, active } = {}
+  {
+    name,
+    phone,
+    phone2,
+    address,
+    notes,
+    username,
+    id_image_url,
+    vehicle_plate,
+    vehicle_type,
+    vehicle_model,
+    company_vehicle,
+    responsible_areas,
+    active,
+  } = {}
 ) {
   const response = await api.patch(
     `/api/distributors/${distributorsId}`,
-    cleanObject({ name, phone, address, notes, username, active })
+    cleanObject({
+      name,
+      phone,
+      phone2,
+      address,
+      notes,
+      username,
+      id_image_url,
+      vehicle_plate,
+      vehicle_type,
+      vehicle_model,
+      company_vehicle,
+      responsible_areas,
+      active,
+    })
   );
   return response.data;
+}
+
+export async function uploadDistributorIdImage(distributorId, file) {
+  const formData = new FormData();
+  formData.append("image", file);
+  const response = await api.post(
+    `/api/distributors/${distributorId}/id-image`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
+  return response.data; // { id_image_url }
 }
 
 /** توليد توكن لمرة واحدة لتعيين كلمة المرور */
@@ -51,4 +119,12 @@ export async function issuePasswordToken(distributorsId) {
     `/api/distributors/${distributorsId}/password-token`
   );
   return response.data; // { userId, token, setUrl, waText, expiresAt }
+}
+
+export async function listActiveDistributors({ q } = {}) {
+  const params = new URLSearchParams();
+  params.set("active", "true");
+  if (q) params.set("search", q);
+  const res = await api.get(`/api/distributors?${params.toString()}`);
+  return res.data;
 }

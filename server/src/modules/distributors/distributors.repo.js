@@ -1,20 +1,33 @@
 import knex from "../../db.js";
 
-export function search({ search } = {}) {
+export function search({ search, active } = {}) {
   const q = knex("distributors as s")
+    .leftJoin("users as u", "u.distributor_id", "s.id")
     .select(
       "s.id",
       "s.name",
       "s.phone",
+      "s.phone2",
       "s.address",
       "s.notes",
+      "s.id_image_url",
+      "s.vehicle_plate",
+      "s.vehicle_type",
+      "s.vehicle_model",
+      "s.company_vehicle",
+      "s.responsible_areas",
       "s.active",
       "s.created_at",
+      "u.username",
+      "u.must_change_password",
       knex.raw(
         "(select count(*) from orders o where o.distributor_id = s.id) as orders_count"
       )
-    )
-    .orderBy("s.id", "desc");
+    );
+
+  if (active !== undefined) {
+    q.where("s.active", !!active);
+  }
 
   if (search) {
     const s = `%${String(search).trim()}%`;
@@ -25,12 +38,31 @@ export function search({ search } = {}) {
   return q;
 }
 
-export async function createDistributor({ name, phone, address, notes }) {
+export async function createDistributor({
+  name,
+  phone,
+  phone2,
+  address,
+  notes,
+  id_image_url,
+  vehicle_plate,
+  vehicle_type,
+  vehicle_model,
+  company_vehicle,
+  responsible_areas,
+}) {
   const inserted = await knex("distributors").insert({
     name,
     phone,
+    phone2,
     address,
     notes,
+    id_image_url,
+    vehicle_plate,
+    vehicle_type,
+    vehicle_model,
+    company_vehicle,
+    responsible_areas,
     active: true,
   });
   const id = Array.isArray(inserted) ? inserted[0] : inserted;
@@ -38,18 +70,60 @@ export async function createDistributor({ name, phone, address, notes }) {
 }
 
 export async function getDistributorById(id) {
-  return knex("distributors").where({ id }).first();
+  return knex("distributors as s")
+    .leftJoin("users as u", "u.distributor_id", "s.id")
+    .select(
+      "s.id",
+      "s.name",
+      "s.phone",
+      "s.phone2",
+      "s.address",
+      "s.notes",
+      "s.id_image_url",
+      "s.vehicle_plate",
+      "s.vehicle_type",
+      "s.vehicle_model",
+      "s.company_vehicle",
+      "s.responsible_areas",
+      "s.active",
+      "s.created_at",
+      "u.username",
+      "u.must_change_password"
+    )
+    .where("s.id", id)
+    .first();
 }
 
 export async function updateDistributor(
   id,
-  { name, phone, address, notes, active }
+  {
+    name,
+    phone,
+    phone2,
+    address,
+    notes,
+    id_image_url,
+    vehicle_plate,
+    vehicle_type,
+    vehicle_model,
+    company_vehicle,
+    responsible_areas,
+    active,
+  }
 ) {
   const patch = {};
   if (name !== undefined) patch.name = name;
   if (phone !== undefined) patch.phone = phone;
+  if (phone2 !== undefined) patch.phone2 = phone2;
   if (address !== undefined) patch.address = address;
   if (notes !== undefined) patch.notes = notes;
+  if (id_image_url !== undefined) patch.id_image_url = id_image_url;
+  if (vehicle_plate !== undefined) patch.vehicle_plate = vehicle_plate;
+  if (vehicle_type !== undefined) patch.vehicle_type = vehicle_type;
+  if (vehicle_model !== undefined) patch.vehicle_model = vehicle_model;
+  if (company_vehicle !== undefined) patch.company_vehicle = !!company_vehicle;
+  if (responsible_areas !== undefined)
+    patch.responsible_areas = responsible_areas;
   if (active !== undefined) patch.active = !!active;
 
   await knex("distributors").where({ id }).update(patch);
@@ -122,4 +196,10 @@ export async function setUsersActiveByDistributor(distributorId, active) {
   await knex("users")
     .where({ distributor_id: distributorId })
     .update({ active: newValue });
+}
+
+export async function transferCustomers(fromDistributorId, toDistributorId) {
+  return knex("customers")
+    .where({ distributor_id: fromDistributorId })
+    .update({ distributor_id: toDistributorId });
 }

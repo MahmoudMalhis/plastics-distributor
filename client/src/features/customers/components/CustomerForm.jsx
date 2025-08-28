@@ -1,8 +1,23 @@
 import FormInput from "../../../components/ui/FormInput";
+import DistributorSelect from "../../distributors/components/DistributorSelect";
 
-export default function CustomerForm({ form, setForm, error }) {
+export default function CustomerForm({
+  form,
+  setForm,
+  error,
+  isAdmin,
+  submitting,
+  setField,
+}) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4" dir="rtl">
+      {isAdmin && (
+        <DistributorSelect
+          value={form.distributor_id}
+          onChange={(id) => setField("distributor_id", id)}
+          disabled={submitting}
+        />
+      )}
       <FormInput
         label="اسم العميل"
         required
@@ -41,6 +56,16 @@ export default function CustomerForm({ form, setForm, error }) {
           readOnly
           disabled
         />
+      )}
+      {form.latitude && form.longitude && (
+        <a
+          href={`https://www.google.com/maps?q=${form.latitude},${form.longitude}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 underline text-sm"
+        >
+          عرض على الخريطة
+        </a>
       )}
       {error && (
         <div className="text-red-600 text-sm mt-2 col-span-2">{error}</div>

@@ -9,6 +9,9 @@ export async function list({ search, page, limit } = {}) {
     "c.phone",
     "c.address",
     "c.notes",
+    "c.distributor_id",
+    "c.latitude",
+    "c.longitude",
     "c.active",
     "c.created_at"
   );
@@ -55,6 +58,9 @@ export async function getDetails(id) {
       "c.phone",
       "c.address",
       "c.notes",
+      "c.distributor_id",
+      "c.latitude",
+      "c.longitude",
       "c.active",
       "c.created_at"
     )

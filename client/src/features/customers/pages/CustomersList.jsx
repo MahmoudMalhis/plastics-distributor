@@ -9,7 +9,7 @@ import {
   updateCustomer,
 } from "../api/customers.api";
 import CustomerForm from "../components/CustomerForm";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 export default function CustomersList() {
   const [search, setSearch] = useState("");
@@ -19,7 +19,6 @@ export default function CustomersList() {
   const [limit] = useState(20);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -206,7 +205,15 @@ export default function CustomersList() {
             items.map((cust, idx) => (
               <tr key={cust.id} className="border-t border-[#eef3f7]">
                 <td className="p-3">{(page - 1) * limit + idx + 1}</td>
-                <td className="p-3">{cust.name}</td>
+                <td className="p-3 font-bold">
+                  <Link
+                    to={`/customers/${cust.id}`}
+                    className="hover:text-blue-600 hover:underline"
+                    title="عرض ملف الموزّع"
+                  >
+                    {cust.name}
+                  </Link>
+                </td>
                 <td className="p-3">{cust.customer_sku}</td>
                 <td className="p-3">{cust.phone || "—"}</td>
                 <td className="p-3">
@@ -226,20 +233,9 @@ export default function CustomersList() {
                 </td>
                 <td className="p-3 text-center flex justify-center gap-3">
                   <button
-                    onClick={() => navigate(`/customers/${cust.id}`)}
-                    className="inline-flex items-center justify-center transition shadow-sm cursor-pointer
-                                rounded-full
-                                 bg-blue-100 text-blue-600 hover:bg-blue-200
-                                w-9 h-9 text-[20px]"
-                  >
-                    <span className="material-icons">info</span>
-                  </button>
-                  <button
                     onClick={() => openEdit(cust)}
                     className="inline-flex items-center justify-center transition shadow-sm cursor-pointer
-                                rounded-full
-                               
-                                 bg-yellow-100 text-yellow-600 hover:bg-yellow-200
+                                rounded-full bg-yellow-100 text-yellow-600 hover:bg-yellow-200
                                 w-9 h-9 text-[20px]
                                 "
                   >

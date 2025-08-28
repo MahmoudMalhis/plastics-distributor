@@ -7,7 +7,7 @@ export default function Modal({ open, title, onClose, children, footer }) {
       aria-modal="true"
     >
       <div
-        className="w-full max-w-5xl bg-gray-50 rounded-xl shadow-xl overflow-hidden"
+        className="w-full max-w-5xl max-h-[90vh] bg-gray-50 rounded-xl shadow-xl overflow-y-scroll"
         dir="rtl"
       >
         <div className="p-4 md:p-8">

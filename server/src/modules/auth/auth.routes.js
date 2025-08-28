@@ -5,10 +5,12 @@ import {
   loginRateLimiter,
   strictRateLimiter,
   tokenVerifyRateLimiter,
-} from "../../middlewares/rate-limit.js"; // إن عندك واحد عام، أو احذف السطر
+} from "../../middlewares/rate-limit.js";
+import { ensureActive, requireAuth } from "../../core/auth/rbac.js";
 
 const router = Router();
 
+router.get("/me", requireAuth, ensureActive, ctrl.me);
 router.get("/initialized", ctrl.initialized);
 router.post("/login", loginRateLimiter, ctrl.login);
 router.post("/refresh", ctrl.refresh);
@@ -18,5 +20,11 @@ router.get(
   ctrl.verifyPasswordToken
 );
 router.post("/set-password", strictRateLimiter, ctrl.setPassword);
-
+router.post(
+  "/change-password",
+  requireAuth,
+  ensureActive,
+  strictRateLimiter,
+  ctrl.changeMyPassword
+);
 export default router;
