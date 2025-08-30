@@ -12,7 +12,7 @@ function isDistributor(user) {
 
 async function assertDistributorActive(distributor_id) {
   if (distributor_id == null) return;
-  const d = await distributorsRepo.getDistributorById.findById(distributor_id);
+  const d = await distributorsRepo.getDistributorById(distributor_id);
   if (!d) {
     const err = new Error("الموزّع غير موجود");
     err.status = 400;

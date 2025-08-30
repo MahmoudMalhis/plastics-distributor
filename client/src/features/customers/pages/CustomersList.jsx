@@ -28,7 +28,11 @@ export default function CustomersList() {
     address: "",
     notes: "",
     customer_sku: "",
+    distributor_id: null,
   });
+
+  const role = localStorage.getItem("userRole");
+  const isAdmin = role === "admin";
 
   // جلب العملاء عند تغيير البحث أو الصفحة
   useEffect(() => {
@@ -77,18 +81,20 @@ export default function CustomersList() {
       address: "",
       notes: "",
       customer_sku: "",
+      distributor_id: null,
     });
     setOpen(true);
   }
 
   function openEdit(cust) {
     setForm({
-      id: cust.id,
+      id: Number(cust.id),
       name: cust.name || "",
       phone: cust.phone || "",
       address: cust.address || "",
       notes: cust.notes || "",
       customer_sku: cust.customer_sku || "",
+      distributor_id: cust.distributor_id ?? null,
     });
     setOpen(true);
   }
@@ -97,28 +103,36 @@ export default function CustomersList() {
     e.preventDefault();
     const name = (form.name || "").trim();
     if (!name) return;
+
     setSaving(true);
     setError("");
+
     try {
+      const payload = {
+        name: form.name,
+        phone: form.phone,
+        address: form.address,
+        notes: form.notes,
+      };
+      if (isAdmin)
+        payload.distributor_id =
+          form.distributor_id != null && form.distributor_id !== ""
+            ? Number(form.distributor_id)
+            : null;
       if (form.id) {
-        const data = await updateCustomer(form.id, {
-          name: form.name,
-          phone: form.phone,
-          address: form.address,
-          notes: form.notes,
-        });
-        setItems((prev) => prev.map((c) => (c.id === form.id ? data : c)));
+        // تعديل
+        const idNum = Number(form.id); // لو حاب تتأكد أنه رقم
+        const data = await updateCustomer(idNum, payload);
+        setItems((prev) => prev.map((c) => (c.id === idNum ? data : c)));
       } else {
-        const data = await createCustomer({
-          name: form.name,
-          phone: form.phone,
-          address: form.address,
-          notes: form.notes,
-        });
+        // إضافة
+        const data = await createCustomer(payload);
         setItems((prev) => [...prev, data]);
       }
+
       setOpen(false);
       notify("success", "تم الحفظ بنجاح");
+      setError("");
     } catch (e) {
       setError(e?.response?.data?.error || "فشل الحفظ");
     } finally {
@@ -209,7 +223,7 @@ export default function CustomersList() {
                   <Link
                     to={`/customers/${cust.id}`}
                     className="hover:text-blue-600 hover:underline"
-                    title="عرض ملف الموزّع"
+                    title="عرض ملف العميل"
                   >
                     {cust.name}
                   </Link>
@@ -318,7 +332,14 @@ export default function CustomersList() {
           className="space-y-4"
           dir="rtl"
         >
-          <CustomerForm form={form} setForm={setForm} error={error} />
+          <CustomerForm
+            form={form}
+            setForm={setForm}
+            error={error}
+            setField={(k, v) => setForm((prev) => ({ ...prev, [k]: v }))}
+            isAdmin={isAdmin}
+            submitting={saving}
+          />
         </form>
       </Modal>
     </div>

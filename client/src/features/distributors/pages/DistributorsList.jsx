@@ -238,7 +238,7 @@ export default function DistributorsList() {
           <span className="material-icons ml-2 sm:ml-3 text-base sm:text-[20px]">
             add
           </span>
-          مورد جديد
+          موزع جديد
         </button>
       </PageHeader>
 

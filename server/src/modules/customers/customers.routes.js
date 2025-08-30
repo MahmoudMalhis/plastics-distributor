@@ -7,6 +7,6 @@ const router = Router();
 router.get("/", requireAuth, ctrl.list);
 router.post("/", requireAuth, ctrl.create);
 router.get("/:id", requireAuth, ctrl.show);
-router.patch("/:id", requireAuth, requireAdmin, ctrl.update);
+router.patch("/:id", requireAuth, ctrl.update);
 
 export default router;

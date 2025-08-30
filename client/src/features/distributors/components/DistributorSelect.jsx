@@ -1,29 +1,11 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 // progect/client/src/features/customers/components/DistributorSelect.jsx
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import AsyncSelect from "react-select/async";
 import {
   getDistributor,
   listActiveDistributors,
-} from "../api/distributors.api";
+} from "../api/distributors.api"; // تأكد من هذا المسار
 
-// دالة مساعدة بدون تبعيات خارجية
-function debounce(fn, wait = 300) {
-  let t;
-  return (...args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), wait);
-  };
-}
-
-/**
- * props:
- * - value: number | null              // id للموزّع الحالي
- * - onChange: (id|null) => void
- * - disabled?: boolean
- * - placeholder?: string
- * - className?: string
- */
 export default function DistributorSelect({
   value,
   onChange,
@@ -33,60 +15,37 @@ export default function DistributorSelect({
 }) {
   const [selected, setSelected] = useState(null);
 
-  // حمّل خيار البداية إن كان عندنا id بدون بيانات معروضة
   useEffect(() => {
     let mounted = true;
-    async function loadInitial() {
-      if (value == null) {
-        setSelected(null);
-        return;
-      }
-      // إن كان selected مطابق، لا تعيد التحميل
-      if (selected?.value === value) return;
-
+    (async () => {
+      if (value == null) return setSelected(null);
       try {
         const d = await getDistributor(value);
-        if (mounted && d) {
-          setSelected({ value: d.id, label: d.name, meta: d });
-        }
+        if (mounted && d) setSelected({ value: d.id, label: d.name, meta: d });
       } catch {
         if (mounted) setSelected(null);
       }
-    }
-    loadInitial();
+    })();
     return () => {
       mounted = false;
     };
-  }, [value]); // عمداً لا نضع selected هنا
+  }, [value]);
 
-  const mapOptions = useCallback((rows = []) => {
-    return rows.map((d) => ({
-      value: d.id,
-      label: d.name,
-      meta: d,
-    }));
-  }, []);
+  const mapOptions = useCallback(
+    (rows = []) => rows.map((d) => ({ value: d.id, label: d.name, meta: d })),
+    []
+  );
 
-  // الدالة التي تجلب الخيارات (مع فلترة في الـ backend)
-  const fetchOptions = useCallback(
+  // مهم: loadOptions ترجع Promise
+  const loadOptions = useCallback(
     async (inputValue) => {
       const rows = await listActiveDistributors({ q: inputValue || "" });
-      // backend عندك يعيد Array مباشرة
-      return mapOptions(rows);
+      // طبّع النتيجة إلى Array لو الـ API يرجّع {items:[]}
+      const list = Array.isArray(rows) ? rows : rows?.items || rows?.rows || [];
+      return mapOptions(list);
     },
     [mapOptions]
   );
-
-  // لفّها بـ debounce لتخفيف الطلبات
-  const loadOptions = useMemo(
-    () => debounce(fetchOptions, 300),
-    [fetchOptions]
-  );
-
-  const handleChange = (opt) => {
-    setSelected(opt || null);
-    onChange?.(opt ? opt.value : null);
-  };
 
   return (
     <div className={className}>
@@ -100,10 +59,11 @@ export default function DistributorSelect({
         isClearable
         placeholder={placeholder}
         value={selected}
-        onChange={handleChange}
-        // لا نفلتر محليًا لأن السيرفر مسؤول عن البحث
+        onChange={(opt) => {
+          setSelected(opt || null);
+          onChange?.(opt ? opt.value : null);
+        }}
         filterOption={() => true}
-        // تحسينات للـ menu فوق أي عناصر
         menuPortalTarget={
           typeof document !== "undefined" ? document.body : null
         }
@@ -111,13 +71,9 @@ export default function DistributorSelect({
           menuPortal: (base) => ({ ...base, zIndex: 9999 }),
           control: (base) => ({ ...base, minHeight: 42 }),
         }}
-        // شكل العنصر في القائمة (اختياري)
         formatOptionLabel={(opt) => (
           <div className="flex flex-col">
             <span className="font-medium">{opt.meta?.name ?? opt.label}</span>
-            {opt.meta?.phone ? (
-              <span className="text-xs opacity-70">{opt.meta.phone}</span>
-            ) : null}
           </div>
         )}
         noOptionsMessage={() => "لا توجد نتائج"}
