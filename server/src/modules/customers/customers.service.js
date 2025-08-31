@@ -7,7 +7,10 @@ function isAdmin(user) {
 }
 
 function isDistributor(user) {
-  return user && user.role === "distributor" && user.distributor_id;
+  return !!(
+    user &&
+    (user.role === "distributor" || user.distributor_id != null)
+  );
 }
 
 async function assertDistributorActive(distributor_id) {
@@ -39,7 +42,13 @@ function assertLatLng(lat, lng) {
 }
 
 // قائمة العملاء
-export function list(opts = {}) {
+export function list(opts = {}, currentUser) {
+  if (currentUser?.role === "distributor" && currentUser?.distributor_id) {
+    return repo.list({
+      ...opts,
+      distributor_id: Number(currentUser.distributor_id),
+    });
+  }
   return repo.list(opts);
 }
 
@@ -63,10 +72,21 @@ export async function create(dto = {}, currentUser) {
   let distributor_id = null;
   if (isDistributor(currentUser)) {
     // الموزّع لا يحدّد موزّعًا آخر—يثبّت نفسه
-    distributor_id = currentUser.distributor_id;
+    const fromUser = currentUser.distributor_id ?? null;
+    if (fromUser == null) {
+      const err = new Error(
+        "هذا الحساب موزّع لكنه غير مرتبط بأي موزّع. الرجاء ربط المستخدم بموزّع."
+      );
+      err.status = 400;
+      throw err;
+    }
+    distributor_id = Number(fromUser);
   } else if (isAdmin(currentUser)) {
     // للأدمن: إن أرسل distributor_id تحقّق منه
-    distributor_id = dto.distributor_id ?? null;
+    distributor_id =
+      dto.distributor_id != null && dto.distributor_id !== ""
+        ? Number(dto.distributor_id)
+        : null;
     await assertDistributorActive(distributor_id);
   } else {
     const err = new Error("صلاحيات غير كافية");
@@ -75,7 +95,14 @@ export async function create(dto = {}, currentUser) {
   }
 
   // تحقق الإحداثيات
-  assertLatLng(dto.latitude, dto.longitude);
+  const lat =
+    dto.latitude === "" || dto.latitude == null ? null : Number(dto.latitude);
+  const lng =
+    dto.longitude === "" || dto.longitude == null
+      ? null
+      : Number(dto.longitude);
+  assertLatLng(lat, lng);
+
   const toInsert = {
     name,
     customer_sku,
@@ -83,8 +110,8 @@ export async function create(dto = {}, currentUser) {
     address: dto.address ? String(dto.address) : null,
     notes: dto.notes ? String(dto.notes) : null,
     distributor_id,
-    latitude: dto.latitude ?? null,
-    longitude: dto.longitude ?? null,
+    latitude: lat,
+    longitude: lng,
     active: typeof dto.active === "boolean" ? dto.active : true,
     created_at: new Date(),
   };
@@ -106,16 +133,21 @@ export async function update(id, dto = {}, currentUser) {
     // الموزّع لا يستطيع نقل العميل لموزّع آخر
     if (
       nextDistributorId != null &&
-      nextDistributorId !== currentUser.distributor_id
+      Number(nextDistributorId) !== Number(currentUser.distributor_id)
     ) {
       const err = new Error("لا يمكن للموزّع تغيير الموزّع المسؤول عن العميل");
       err.status = 403;
       throw err;
     }
-    nextDistributorId = currentUser.distributor_id; // إحكام
+    nextDistributorId = Number(currentUser.distributor_id); // إحكام
   } else if (isAdmin(currentUser)) {
     // للأدمن: يسمح بالتغيير (مع تحقق نشاط الموزّع)
-    await assertDistributorActive(nextDistributorId ?? null);
+    const safeId =
+      nextDistributorId == null || nextDistributorId === ""
+        ? null
+        : Number(nextDistributorId);
+    await assertDistributorActive(safeId);
+    nextDistributorId = safeId;
   } else {
     const err = new Error("صلاحيات غير كافية");
     err.status = 403;
@@ -123,15 +155,21 @@ export async function update(id, dto = {}, currentUser) {
   }
 
   // تحقق الإحداثيات
-  assertLatLng(dto.latitude, dto.longitude);
+  const lat =
+    dto.latitude === "" || dto.latitude == null ? null : Number(dto.latitude);
+  const lng =
+    dto.longitude === "" || dto.longitude == null
+      ? null
+      : Number(dto.longitude);
+  assertLatLng(lat, lng);
   const patch = {
     name: dto.name != null ? String(dto.name) : undefined,
     phone: dto.phone != null ? String(dto.phone) : undefined,
     address: dto.address != null ? String(dto.address) : undefined,
     notes: dto.notes != null ? String(dto.notes) : undefined,
     distributor_id: nextDistributorId,
-    latitude: dto.latitude,
-    longitude: dto.longitude,
+    latitude: lat,
+    longitude: lng,
   };
   if (typeof dto.active === "boolean") {
     patch.active = dto.active;

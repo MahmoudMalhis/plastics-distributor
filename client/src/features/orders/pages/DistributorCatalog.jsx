@@ -8,8 +8,12 @@ import {
 import { addItem, useCart, setCustomer } from "../state/cart.store";
 import QuantityInput from "../../../components/ui/QuantityInput";
 import PageHeader from "../../../components/ui/PageHeader";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import CustomerSelect from "../../customers/components/CustomerSelect";
+import { notify } from "../../../utils/alerts";
+import { createCustomer } from "../../customers/api/customers.api";
+import Modal from "../../../components/ui/Modal";
+import CustomerForm from "../../customers/components/CustomerForm";
 
 export default function DistributorCatalog() {
   const [q, setQ] = useState("");
@@ -26,9 +30,39 @@ export default function DistributorCatalog() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const location = useLocation();
   const navigate = useNavigate();
   const { items: item, customer } = useCart();
+  const [openCreate, setOpenCreate] = useState(false);
+  const [savingNew, setSavingNew] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [form, setForm] = useState({
+    id: null,
+    name: "",
+    phone: "",
+    address: "",
+    notes: "",
+    customer_sku: "",
+  });
+  const setField = (k, v) => setForm((prev) => ({ ...prev, [k]: v }));
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("create") === "1") {
+      setForm({
+        id: null,
+        name: "",
+        phone: "",
+        address: "",
+        notes: "",
+        customer_sku: "",
+      });
+      setFormError("");
+      setOpenCreate(true);
+      // نظّف الاستعلام من العنوان الحالي
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.search]);
   // داخل رسم بطاقة المنتج
 
   useEffect(() => {
@@ -132,7 +166,18 @@ export default function DistributorCatalog() {
             <CustomerSelect
               selected={customer}
               onSelect={(c) => setCustomer(c)}
-              onCreateNew={() => navigate("/customers/new")}
+              onCreateNew={() => {
+                setForm({
+                  id: null,
+                  name: "",
+                  phone: "",
+                  address: "",
+                  notes: "",
+                  customer_sku: "",
+                });
+                setFormError("");
+                setOpenCreate(true);
+              }}
             />
           </div>
 
@@ -214,6 +259,74 @@ export default function DistributorCatalog() {
           onNext={() => setPage((n) => Math.min(pages, n + 1))}
         />
       </div>
+      <Modal
+        open={openCreate}
+        onClose={() => setOpenCreate(false)}
+        title="إضافة عميل جديد"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setOpenCreate(false)}
+              className="px-4 h-11 rounded-lg border border-gray-300 hover:bg-gray-50 cursor-pointer"
+            >
+              إلغاء
+            </button>
+            <button
+              form="create-customer-form"
+              type="submit"
+              disabled={savingNew}
+              className="inline-flex items-center gap-2 px-4 h-11 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-60 cursor-pointer"
+            >
+              <span className="material-icons text-[18px]">
+                {savingNew ? "hourglass_top" : "save"}
+              </span>
+              {savingNew ? "جارٍ الحفظ..." : "حفظ"}
+            </button>
+          </>
+        }
+      >
+        <form
+          id="create-customer-form"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const name = (form.name || "").trim();
+            if (!name) {
+              setFormError("اسم العميل مطلوب");
+              return;
+            }
+            try {
+              setSavingNew(true);
+              setFormError("");
+              // السيرفر سيربط العميل تلقائيًا بالموزّع الحالي (حسب منطقك في customers.service)
+              const created = await createCustomer({
+                name: form.name,
+                phone: form.phone,
+                address: form.address,
+                notes: form.notes,
+              });
+              setCustomer(created); // اختَر العميل الجديد في السلة
+              notify("success", "تم إنشاء العميل وربطه بك كموزّع");
+              setOpenCreate(false);
+            } catch (err) {
+              setFormError(err?.response?.data?.error || "فشل حفظ العميل");
+            } finally {
+              setSavingNew(false);
+            }
+          }}
+          className="space-y-4"
+          dir="rtl"
+        >
+          <CustomerForm
+            form={form}
+            setForm={setForm}
+            setField={setField}
+            isAdmin={false} // الموزّع لا يرى اختيار الموزّع
+            submitting={savingNew}
+            error={formError}
+          />
+        </form>
+      </Modal>
     </>
   );
 }

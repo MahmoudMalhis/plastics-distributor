@@ -2,19 +2,34 @@
 import { api } from "../../../lib/api";
 
 /** إنشاء طلب جديد */
-export async function createOrder({ items, notes } = {}) {
-  // تحويل عناصر السلة إلى شكل يتوقعه الخادم
-  // product_id + quantity (+ price إن كان مطلوبًا)
+export async function createOrder({
+  items,
+  notes,
+  customer_id,
+  status = "submitted",
+  payment_method = "cash",
+  installment_amount,
+  installment_period, // "weekly" | "monthly"
+  check_note,
+} = {}) {
   const payload = {
+    customer_id,
+    status, // "draft" | "submitted"
+    payment_method, // "cash" | "installments" | "cheque"
+    // لو installments
+    installment_amount,
+    installment_period,
+    // لو cheque
+    check_note,
+    // عناصر الطلب: السيرفر هو اللي يحدد السعر
     items: (items || []).map((it) => ({
       product_id: it.productId,
-      quantity: it.qty,
-      price: it.price, // احذف هذا السطر إذا كان السيرفر لا يستقبل السعر من العميل
+      qty: it.qty,
     })),
     notes,
   };
   const { data } = await api.post("/api/orders", payload);
-  return data; // نتوقع { id, ... }
+  return data; // غالبًا { order, items, ... }
 }
 
 /** قائمة طلباتي */
@@ -25,16 +40,12 @@ export async function listMyOrders({
   status,
 } = {}) {
   const params = {
-    mine: true,
     page,
-    pageSize,
-    q,
-    status,
+    limit: pageSize,
+    search: q,
+    status, // إن أردت لاحقًا تدعيم فلترة الحالة في السيرفر
   };
-  Object.keys(params).forEach(
-    (k) => params[k] === undefined && delete params[k]
-  );
-
+  Object.keys(params).forEach((k) => params[k] == null && delete params[k]);
   const { data } = await api.get("/api/orders", { params });
   if (Array.isArray(data)) return { rows: data, total: data.length };
   return {
@@ -46,5 +57,39 @@ export async function listMyOrders({
 /** تفاصيل طلب */
 export async function getOrder(orderId) {
   const { data } = await api.get(`/api/orders/${orderId}`);
-  return data; // نتوقع { id, status, total, items: [...] , created_at, ... }
+  // السيرفر يرجّع { order, items, revisions, customer }
+  if (!data?.order) return data;
+  const o = data.order;
+  const items = (data.items || []).map((it) => {
+    // product_snapshot فيه name/sku/price المحتسبة وقت الطلب
+    let snap = {};
+    try {
+      snap = it.product_snapshot ? JSON.parse(it.product_snapshot) : {};
+    } catch (error) {
+      console.log(error);
+    }
+    return {
+      product_id: it.product_id,
+      product_name: it.product_name || snap.name || "",
+      sku: snap.sku || null,
+      unit_price: Number(it.unit_price ?? snap.price ?? 0),
+      qty: Number(it.qty ?? it.quantity ?? 0),
+      image: snap.image || null, // لو بتخزنها مستقبلًا
+    };
+  });
+  return {
+    id: o.id,
+    code: o.code,
+    status: o.status,
+    total: Number(o.total || 0),
+    created_at: o.created_at,
+    notes: o.notes || null,
+    payment_method: o.payment_method,
+    installment_plan_id: o.installment_plan_id,
+    check_note: o.check_note,
+    customer: data.customer || null,
+    items,
+    revisions: data.revisions || [],
+    raw: data, // لو احتجته مستقبلًا
+  };
 }

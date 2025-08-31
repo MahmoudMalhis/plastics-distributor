@@ -10,16 +10,22 @@ export default function CustomerSelect({ selected, onSelect, onCreateNew }) {
     data: cust,
   });
 
-  // تحميل الخيارات بناء على نص البحث
   const loadOptions = async (inputValue) => {
     const { rows } = await listCustomers({ search: inputValue });
+    const user = JSON.parse(localStorage.getItem("user"));
+    const myDistId = user?.distributor_id ?? null;
+
     return (
       (rows || [])
-        // اسمح بالقيم: true أو 1 فقط
+        // هنا نحتفظ فقط بعملاء الموزع الحالى (أو كل العملاء إذا كان Admin)
+        .filter((c) =>
+          myDistId ? Number(c.distributor_id) === Number(myDistId) : true
+        )
         .filter((c) => c.active === true || c.active === 1)
         .map(toOption)
     );
   };
+
   return (
     <div dir="rtl">
       <AsyncSelect

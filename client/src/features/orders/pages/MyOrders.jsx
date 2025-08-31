@@ -1,5 +1,5 @@
 // client/src/features/orders/pages/MyOrders.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { listMyOrders } from "../api/orders.api";
 import { Link } from "react-router-dom";
 import PageHeader from "../../../components/ui/PageHeader";
@@ -54,11 +54,6 @@ export default function MyOrders() {
     };
   }, [page, pageSize, q, status]);
 
-  const pages = useMemo(
-    () => Math.max(1, Math.ceil(total / pageSize)),
-    [total, pageSize]
-  );
-
   return (
     <>
       <PageHeader title="طلباتي"></PageHeader>
@@ -93,11 +88,10 @@ export default function MyOrders() {
             className="flex w-full min-w-0 flex-1 rounded-lg text-[#0d141c] border border-[#cedbe8] bg-slate-50 h-12 p-[12px] rounded-r-none border-r-0 pr-2 text-base focus:outline-none"
           >
             <option value="">الكل</option>
-            <option value="pending">قيد المراجعة</option>
-            <option value="confirmed">مؤكد</option>
-            <option value="shipped">تم الشحن</option>
-            <option value="completed">مكتمل</option>
-            <option value="cancelled">ملغي</option>
+            <option value="draft">مسودة</option>
+            <option value="submitted">مرسلة</option>
+            <option value="fulfilled">مكتملة</option>
+            <option value="cancelled">ملغاة</option>
           </select>
         </label>
       </div>
@@ -191,11 +185,10 @@ export default function MyOrders() {
 
 function renderStatus(s) {
   const map = {
-    pending: "قيد المراجعة",
-    confirmed: "مؤكد",
-    shipped: "تم الشحن",
-    completed: "مكتمل",
-    cancelled: "ملغي",
+    draft: "مسودة",
+    submitted: "مرسلة",
+    fulfilled: "مكتملة",
+    cancelled: "ملغاة",
   };
   return map[s] || s || "—";
 }

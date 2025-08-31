@@ -66,15 +66,17 @@ export default function CartEditor() {
         items,
         notes,
         customer_id: customer?.id,
-        customer_name: customer?.name,
+        status: "submitted",
+        payment_method: "cash",
       });
       const orderId = res?.id || res?.order?.id;
       clearCart();
       if (orderId)
         navigate(`/distributor/orders/${orderId}`, { replace: true });
       else navigate(`/distributor/orders`, { replace: true });
-    } catch (e) {
+    } catch (error) {
       notify("error", "تعذر إرسال الطلب");
+      console.log(error);
     } finally {
       setSubmitting(false);
     }

@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import { io } from "../../server.js";
 import { randomPassword, randomToken } from "../../utils/password.js";
 import { buildWaText } from "../../utils/wa.js";
+import * as customersRepo from "../customers/customers.repo.js";
 
 // قائمة الموردين
 export async function list({ search } = {}) {
@@ -91,30 +92,15 @@ export async function update(
     company_vehicle,
     responsible_areas,
     active,
+    transfer_customers_to,
   }
 ) {
   const distributor = await repo.getDistributorById(id);
   if (!distributor)
     throw Object.assign(new Error("الموزع غير موجود"), { status: 404 });
 
-  // حدّث بيانات الموزع في قاعدة البيانات
-  const updated = await repo.updateDistributor(id, {
-    name,
-    phone,
-    phone2,
-    address,
-    notes,
-    id_image_url,
-    vehicle_plate,
-    vehicle_type,
-    vehicle_model,
-    company_vehicle,
-    responsible_areas,
-    active,
-  });
-
-  // حوّل قيمة active إلى Boolean حقيقي أياً كان نوعها
-  let activeParsed;
+  // 1) حوّل active مبكراً وبشكل آمن
+  let activeParsed = null;
   if (active !== undefined && active !== null) {
     if (typeof active === "boolean") activeParsed = active;
     else if (typeof active === "number") activeParsed = active !== 0;
@@ -123,7 +109,44 @@ export async function update(
     else activeParsed = !!active;
   }
 
-  // عند التعطيل
+  // 2) لو المطلوب "تعطيل" ومعه نقل عملاء → نفّذ النقل أولاً
+  if (activeParsed === false && transfer_customers_to != null) {
+    const targetId = Number(transfer_customers_to);
+    if (!Number.isFinite(targetId) || targetId === id) {
+      const err = new Error("موزّع الهدف غير صالح");
+      err.status = 400;
+      throw err;
+    }
+    const target = await repo.getDistributorById(targetId);
+    if (!target || !target.active) {
+      const err = new Error("الموزّع الهدف غير موجود أو غير نشط");
+      err.status = 400;
+      throw err;
+    }
+    await customersRepo.bulkReassign(id, targetId);
+  }
+
+  // 3) جهّز patch للتحديث (لا تعدّل active إلا إذا أُرسل فعلاً)
+  const patch = {};
+  if (name !== undefined) patch.name = name;
+  if (phone !== undefined) patch.phone = phone;
+  if (phone2 !== undefined) patch.phone2 = phone2;
+  if (address !== undefined) patch.address = address;
+  if (notes !== undefined) patch.notes = notes;
+  if (id_image_url !== undefined) patch.id_image_url = id_image_url;
+  if (vehicle_plate !== undefined) patch.vehicle_plate = vehicle_plate;
+  if (vehicle_type !== undefined) patch.vehicle_type = vehicle_type;
+  if (vehicle_model !== undefined) patch.vehicle_model = vehicle_model;
+  if (company_vehicle !== undefined) patch.company_vehicle = !!company_vehicle;
+  if (responsible_areas !== undefined)
+    patch.responsible_areas = responsible_areas;
+  if (activeParsed !== null) patch.active = activeParsed;
+
+  const updated = Object.keys(patch).length
+    ? await repo.updateDistributor(id, patch)
+    : await repo.getDistributorById(id);
+
+  // 4) فعّل/عطّل حسابات المستخدمين المرتبطين حسب activeParsed (لو أُرسل)
   if (activeParsed === false) {
     const userIds = await repo.getUserIdsByDistributor(id);
     if (userIds.length) {
@@ -135,10 +158,7 @@ export async function update(
         });
       });
     }
-  }
-
-  // عند إعادة التفعيل
-  if (activeParsed === true) {
+  } else if (activeParsed === true) {
     await repo.setUsersActiveByDistributor(id, true);
   }
 

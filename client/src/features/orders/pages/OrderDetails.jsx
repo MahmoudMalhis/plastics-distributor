@@ -11,12 +11,6 @@ export default function OrderDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const Title = ({ children }) => (
-    <h2 className="text-[#0d141c] text-[28px] font-bold leading-tight px-4 text-center pb-3 pt-5">
-      {children}
-    </h2>
-  );
-
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -35,7 +29,7 @@ export default function OrderDetails() {
     return () => (cancelled = true);
   }, [id]);
 
-  const items = order?.items || order?.lines || [];
+  const items = order?.items || [];
 
   return (
     <>

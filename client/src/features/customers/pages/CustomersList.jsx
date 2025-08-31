@@ -29,6 +29,8 @@ export default function CustomersList() {
     notes: "",
     customer_sku: "",
     distributor_id: null,
+    latitude: null,
+    longitude: null,
   });
 
   const role = localStorage.getItem("userRole");
@@ -43,18 +45,31 @@ export default function CustomersList() {
           try {
             setLoading(true);
             setError("");
-            const { rows, total } = await listCustomers({
-              search,
-              page,
-              limit,
-            });
+
+            // جلب كل العملاء
+            const { rows } = await listCustomers({ search, page, limit });
+
             if (!cancelled) {
-              setItems(rows || []);
-              setTotal(Number(total || 0));
+              const user = JSON.parse(localStorage.getItem("user")) || {};
+              const isAdmin = user.role === "admin";
+              const myDistId = user.distributor_id ?? null;
+
+              // إذا كنت Admin نحتفظ بجميع الصفوف، وإن كنت موزعًا نُصفّى حسب distributor_id
+              const filtered = isAdmin
+                ? rows || []
+                : (rows || []).filter(
+                    (c) =>
+                      myDistId != null &&
+                      Number(c.distributor_id) === Number(myDistId)
+                  );
+
+              setItems(filtered);
+              setTotal(filtered.length);
             }
           } catch (e) {
-            if (!cancelled)
+            if (!cancelled) {
               setError(e?.response?.data?.error || "فشل جلب العملاء");
+            }
           } finally {
             if (!cancelled) setLoading(false);
           }
@@ -62,6 +77,7 @@ export default function CustomersList() {
       },
       search ? 350 : 0
     );
+
     return () => {
       cancelled = true;
       clearTimeout(t);
@@ -82,6 +98,8 @@ export default function CustomersList() {
       notes: "",
       customer_sku: "",
       distributor_id: null,
+      latitude: null,
+      longitude: null,
     });
     setOpen(true);
   }
@@ -95,6 +113,8 @@ export default function CustomersList() {
       notes: cust.notes || "",
       customer_sku: cust.customer_sku || "",
       distributor_id: cust.distributor_id ?? null,
+      latitude: cust.latitude ?? null,
+      longitude: cust.longitude ?? null,
     });
     setOpen(true);
   }
@@ -113,6 +133,14 @@ export default function CustomersList() {
         phone: form.phone,
         address: form.address,
         notes: form.notes,
+        latitude:
+          form.latitude === "" || form.latitude == null
+            ? null
+            : Number(form.latitude),
+        longitude:
+          form.longitude === "" || form.longitude == null
+            ? null
+            : Number(form.longitude),
       };
       if (isAdmin)
         payload.distributor_id =
@@ -269,6 +297,26 @@ export default function CustomersList() {
                     <span className="material-icons">
                       {cust.active ? "toggle_off" : "toggle_on"}
                     </span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (cust.latitude && cust.longitude) {
+                        window.open(
+                          `https://www.google.com/maps?q=${cust.latitude},${cust.longitude}&z=17`,
+                          "_blank",
+                          "noopener,noreferrer"
+                        );
+                      }
+                    }}
+                    disabled={!cust.latitude || !cust.longitude}
+                    className={`inline-flex items-center justify-center transition shadow-sm cursor-pointer rounded-full w-9 h-9 text-[20px]
+                    ${
+                      cust.latitude && cust.longitude
+                        ? "bg-blue-100 text-blue-600 hover:bg-blue-200"
+                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    }`}
+                  >
+                    <span className="material-icons">location_on</span>
                   </button>
                 </td>
               </tr>

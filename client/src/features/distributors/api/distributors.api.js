@@ -75,6 +75,7 @@ export async function updateDistributor(
     company_vehicle,
     responsible_areas,
     active,
+    transfer_customers_to,
   } = {}
 ) {
   const response = await api.patch(
@@ -93,6 +94,7 @@ export async function updateDistributor(
       company_vehicle,
       responsible_areas,
       active,
+      transfer_customers_to,
     })
   );
   return response.data;

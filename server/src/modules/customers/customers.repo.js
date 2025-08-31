@@ -90,3 +90,11 @@ export async function getDetails(id) {
 
   return { ...customer, ordersCount, balance, orders };
 }
+
+// نقل كل عملاء موزّع إلى موزّع آخر
+export async function bulkReassign(fromDistributorId, toDistributorId) {
+  if (!fromDistributorId || !toDistributorId) return 0;
+  return db("customers")
+    .where({ distributor_id: fromDistributorId })
+    .update({ distributor_id: toDistributorId });
+}

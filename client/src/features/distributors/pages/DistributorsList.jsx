@@ -12,6 +12,7 @@ import {
   issuePasswordToken,
   createDistributor,
   uploadDistributorIdImage,
+  listActiveDistributors,
 } from "../api/distributors.api";
 import DistributorsForm from "../components/DistributorsForm";
 
@@ -21,6 +22,10 @@ export default function DistributorsList() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [toDeactivate, setToDeactivate] = useState(null); // distributor object
+  const [activeTargets, setActiveTargets] = useState([]);
+  const [targetId, setTargetId] = useState("");
   const [form, setForm] = useState({
     id: null,
     name: "",
@@ -125,16 +130,28 @@ export default function DistributorsList() {
     try {
       const isActive = distributor?.active === true;
       const nextActive = !isActive;
-      await updateDistributor(distributor.id, { active: nextActive });
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === distributor.id ? { ...item, active: nextActive } : item
-        )
-      );
-      notify(
-        "success",
-        nextActive ? "تم تفعيل المورد بنجاح." : "تم إيقاف المورد بنجاح."
-      );
+
+      if (nextActive) {
+        // تفعيل فقط → نفّذ مباشرة كما هو
+        await updateDistributor(distributor.id, { active: true });
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === distributor.id ? { ...item, active: true } : item
+          )
+        );
+        notify("success", "تم تفعيل المورد بنجاح.");
+        return;
+      }
+
+      // إيقاف: افتح مودال النقل
+      setToDeactivate(distributor);
+      setTargetId("");
+      setTransferOpen(true);
+
+      // حمّل الموزعين النشطين (باستثناء هذا)
+      const rows = await listActiveDistributors();
+      const options = (rows || []).filter((d) => d.id !== distributor.id);
+      setActiveTargets(options);
     } catch (error) {
       notify(
         "error",
@@ -310,6 +327,82 @@ export default function DistributorsList() {
         >
           <DistributorsForm form={form} setForm={setForm} error={err} />
         </form>
+      </Modal>
+
+      <Modal
+        open={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        title="إيقاف موزّع ونقل العملاء"
+        footer={
+          <div className="flex gap-2">
+            <button
+              onClick={() => setTransferOpen(false)}
+              className="px-4 h-11 rounded-lg border border-gray-300 hover:bg-gray-50 cursor-pointer"
+            >
+              إلغاء
+            </button>
+            <button
+              disabled={!targetId}
+              onClick={async () => {
+                try {
+                  if (!toDeactivate) return;
+                  await updateDistributor(toDeactivate.id, {
+                    active: false,
+                    transfer_customers_to: Number(targetId),
+                  });
+                  // حدّث القائمة محليًا
+                  setItems((prev) =>
+                    prev.map((item) =>
+                      item.id === toDeactivate.id
+                        ? { ...item, active: false }
+                        : item
+                    )
+                  );
+                  notify("success", "تم نقل العملاء وإيقاف الموزّع بنجاح.");
+                  setTransferOpen(false);
+                  setToDeactivate(null);
+                } catch (error) {
+                  notify(
+                    "error",
+                    error?.response?.data?.error ||
+                      "فشل في نقل العملاء/إيقاف الموزّع."
+                  );
+                }
+              }}
+              className="inline-flex items-center gap-2 px-4 h-11 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-60 cursor-pointer"
+            >
+              تأكيد الإيقاف والنقل
+            </button>
+          </div>
+        }
+      >
+        <div dir="rtl" className="space-y-3">
+          <div className="text-sm text-[#49739c]">
+            اختر موزّعًا نشطًا لنقل العملاء الخاصين بـ{" "}
+            <span className="font-semibold text-[#0d141c]">
+              {toDeactivate?.name || ""}
+            </span>{" "}
+            إليه.
+          </div>
+
+          <label className="flex items-stretch rounded-lg">
+            <div className="text-[#49739c] flex border border-[#cedbe8] bg-slate-50 items-center justify-center pr-[15px] rounded-r-lg border-l-0 px-2">
+              الموزع الهدف
+            </div>
+            <select
+              value={targetId}
+              onChange={(e) => setTargetId(e.target.value)}
+              className="flex w-full min-w-0 flex-1 rounded-lg text-[#0d141c] border border-[#cedbe8] bg-slate-50 h-12 p-[12px] rounded-r-none border-r-0 pr-2 text-base focus:outline-none"
+            >
+              <option value="">اختر موزعًا نشطًا</option>
+              {activeTargets.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </Modal>
     </>
   );

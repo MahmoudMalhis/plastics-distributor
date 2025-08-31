@@ -88,14 +88,18 @@ export default function CustomerProfile() {
               label="الموقع"
               value={
                 customer.latitude && customer.longitude ? (
-                  <a
-                    href={`https://www.google.com/maps?q=${customer.latitude},${customer.longitude}`}
-                    className="text-blue-600 underline"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={() => {
+                      const lat = customer.latitude;
+                      const lng = customer.longitude;
+                      const url = `https://www.google.com/maps?q=${lat},${lng}&z=17`;
+                      window.open(url, "_blank");
+                    }}
+                    className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
                   >
+                    <span className="material-icons">map</span>
                     فتح الخريطة
-                  </a>
+                  </button>
                 ) : (
                   "—"
                 )

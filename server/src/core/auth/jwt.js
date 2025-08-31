@@ -5,17 +5,17 @@ export function signAccess(user) {
     {
       id: user.id,
       role: user.role,
-      distributorId: user.distributor_id ?? null,
+      distributor_id: user.distributor_id ?? null,
       active: user.active,
     },
     process.env.JWT_ACCESS_SECRET,
-    { expiresIn: "1h" }
+    { expiresIn: "1d" }
   );
 }
 
 export function signRefresh(user) {
   return jwt.sign({ id: user.id }, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: "7d",
+    expiresIn: "365d",
   });
 }
 
