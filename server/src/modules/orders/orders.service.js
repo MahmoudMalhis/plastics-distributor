@@ -88,36 +88,43 @@ function normalizePayment(dto = {}) {
 
 // ----- إنشاء -----
 export async function create(payload, currentUser) {
+  console.log("=== ORDER CREATION DEBUG ===");
+  console.log("payload:", payload);
+  console.log("currentUser:", currentUser);
+  console.log("payload.distributor_id:", payload.distributor_id); // تصحيح الخطأ
+  console.log("currentUser.distributor_id:", currentUser?.distributor_id);
+  console.log("=== ORDER CREATION DEBUG ===");
+
   const status = String(payload.status || "draft").toLowerCase();
   if (!["draft", "submitted"].includes(status)) {
     const e = new Error("حالة الطلب غير صالحة");
     e.status = 400;
     throw e;
   }
+  let distributor_id;
+  if (currentUser?.distributor_id != null) {
+    distributor_id = Number(currentUser.distributor_id);
+  } else if (payload.distributor_id != null) {
+    distributor_id = Number(payload.distributor_id);
+  } else {
+    const e = new Error("معرف الموزع مطلوب");
+    e.status = 400;
+    throw e;
+  }
 
-  // هوية الموزّع + منشئ الطلب
-  const distributor_id =
-    currentUser?.role === "distributor"
-      ? Number(currentUser.distributor_id)
-      : payload.distributor_id != null
-      ? Number(payload.distributor_id)
-      : null;
   const created_by = currentUser?.id || null;
 
   const customer_id =
     payload.customer_id != null ? Number(payload.customer_id) : null;
 
   const itemsDto = Array.isArray(payload.items) ? payload.items : [];
-  // إن كان Submitted يجب التحقق من العناصر
   if (status === "submitted") assertItemsValid(itemsDto);
 
   const items = await hydrateItems(itemsDto);
   const total = calcTotal(items);
 
-  // طريقة الدفع
   const pay = normalizePayment(payload);
 
-  // إن كانت تقسيط: أنشئ خطة وضع id (اختياري/محمي try)
   if (
     pay.payment_method === "installments" &&
     pay._installment_amount &&
@@ -130,13 +137,12 @@ export async function create(payload, currentUser) {
       });
       pay.installment_plan_id = plan?.id ?? null;
     } catch {
-      // لو جدول الخطط غير مطابق، يمكنك لاحقًا إنشاءه من الفرونت وتمرير installment_plan_id مباشرة
       pay.installment_plan_id = null;
     }
   }
 
   const baseOrder = {
-    distributor_id: distributor_id ?? null,
+    distributor_id: distributor_id,
     created_by,
     customer_id,
     status,
@@ -160,7 +166,6 @@ export async function create(payload, currentUser) {
   return repo.getOrderFull(order.id);
 }
 
-// ----- قائمة -----
 export async function list(query = {}, currentUser) {
   const opts = {
     search: query.search,
@@ -173,7 +178,6 @@ export async function list(query = {}, currentUser) {
   return repo.listOrders(opts);
 }
 
-// ----- تفاصيل -----
 export async function show(id) {
   const data = await repo.getOrderFull(Number(id));
   if (!data) {
@@ -184,7 +188,6 @@ export async function show(id) {
   return data;
 }
 
-// ----- تحديث -----
 export async function update(id, payload, currentUser) {
   const order = await repo.getOrderById(Number(id));
   if (!order) {
@@ -193,7 +196,6 @@ export async function update(id, payload, currentUser) {
     throw e;
   }
 
-  // صلاحيات الموزّع
   if (
     currentUser?.role === "distributor" &&
     currentUser?.distributor_id &&
@@ -214,9 +216,7 @@ export async function update(id, payload, currentUser) {
     }
   }
 
-  // تجهيز Patch
   const patch = {};
-  // الحالة
   if (payload.status) {
     const next = String(payload.status).toLowerCase();
     if (!["draft", "submitted", "cancelled", "fulfilled"].includes(next)) {
@@ -231,10 +231,8 @@ export async function update(id, payload, currentUser) {
     if (next === "fulfilled") patch.fulfilled_at = dbNow();
   }
 
-  // الملاحظات
   if (payload.notes !== undefined) patch.notes = payload.notes || null;
 
-  // الدفع
   if (
     payload.payment_method !== undefined ||
     payload.installment_amount !== undefined ||
@@ -254,9 +252,7 @@ export async function update(id, payload, currentUser) {
           period: pay._installment_period,
         });
         patch.installment_plan_id = plan?.id ?? null;
-      } catch {
-        // تجاهل لو الجدول مختلف
-      }
+      } catch {}
     } else {
       patch.installment_plan_id = pay.installment_plan_id ?? null;
     }
@@ -264,7 +260,6 @@ export async function update(id, payload, currentUser) {
     patch.check_note = pay.check_note ?? null;
   }
 
-  // العناصر
   let newItems = null;
   if (Array.isArray(payload.items)) {
     if (isSubmitted || patch.status === "submitted") {
@@ -275,7 +270,6 @@ export async function update(id, payload, currentUser) {
   }
 
   if (isSubmitted) {
-    // حفظ نسخة قبل/بعد وتسجيل مراجعة
     const before = await repo.getOrderFull(order.id);
     await repo.updateOrder(order.id, patch);
     if (newItems) {
@@ -292,7 +286,6 @@ export async function update(id, payload, currentUser) {
       change_set: { before, after },
     });
   } else {
-    // الطلب ليس Submitted
     await repo.updateOrder(order.id, patch);
     if (newItems) {
       await repo.deleteItemsByOrder(order.id);
@@ -305,9 +298,6 @@ export async function update(id, payload, currentUser) {
   return repo.getOrderFull(order.id);
 }
 
-// ---- helpers ----
 function dbNow() {
-  // بعض قواعد البيانات تدعم knex.fn.now() مباشرة في update/insert (استُخدمت في repo)
-  // هنا نُعيد ISO لضمان حقل *_at عندنا لو احتجناه بقيمة صريحة
   return new Date().toISOString();
 }

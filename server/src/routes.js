@@ -13,6 +13,6 @@ router.use("/categories", categoriesRoutes);
 router.use("/products", productsRoutes);
 router.use("/distributors", distributorsRoutes);
 router.use("/customers", customersRoutes);
-router.use("/api", ordersRoutes);
+router.use("/orders", ordersRoutes);
 
 export default router;

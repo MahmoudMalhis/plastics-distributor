@@ -44,8 +44,6 @@ export default function App() {
               element={<DistributorCatalog />}
             />
             <Route path="/distributor/cart" element={<CartEditor />} />
-            <Route path="/distributor/orders" element={<MyOrders />} />
-            <Route path="/distributor/orders/:id" element={<OrderDetails />} />
             <Route
               path="/distributor/products/:id"
               element={<ProductDetails />}
@@ -60,6 +58,8 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/customers" element={<CustomersList />} />
             <Route path="/customers/:id" element={<CustomerProfile />} />
+            <Route path="/orders" element={<MyOrders />} />
+            <Route path="/orders/:id" element={<OrderDetails />} />
           </Route>
         </Route>
         <Route path="/unauthorized" element={<Unauthorized />} />

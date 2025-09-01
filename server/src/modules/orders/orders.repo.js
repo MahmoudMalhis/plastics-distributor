@@ -1,17 +1,37 @@
 import db from "../../db/knex.js";
+import { generateOrderCode } from "../../utils/sku.js";
 
 // ====== أوامر أساسية على الطلب ======
 export async function createOrder(order) {
-  const [row] = await db("orders").insert(order).returning("*");
-  const created =
-    row || (await db("orders").where(order).orderBy("id", "desc").first()); // SQLite fallback
-  // توليد code إذا كان العمود موجودًا ويُراد تعبئته
-  if (created && !created.code) {
-    const code = `ORD-${String(created.id).padStart(6, "0")}`;
-    await db("orders").where({ id: created.id }).update({ code });
-    created.code = code;
+  let tries = 0;
+  while (true) {
+    tries++;
+    try {
+      const code = await generateOrderCode(db);
+      const inserted = await db("orders").insert({ ...order, code });
+
+      let id = Array.isArray(inserted) ? inserted[0] : inserted?.id;
+      if (!id) {
+        const row = await db("orders")
+          .select("id")
+          .orderBy("id", "desc")
+          .first();
+        id = row?.id;
+      }
+      return getOrderById(id);
+    } catch (err) {
+      // في MySQL
+      const isDup =
+        err?.code === "ER_DUP_ENTRY" ||
+        /duplicate entry/i.test(err?.sqlMessage || err?.message || "");
+      if (isDup && tries < 3) {
+        // جرّب توليد كود جديد مرة أو مرتين
+        continue;
+      }
+      console.error("Error creating order:", err);
+      throw err;
+    }
   }
-  return created;
 }
 
 export async function updateOrder(id, patch) {

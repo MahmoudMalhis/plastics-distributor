@@ -24,3 +24,9 @@ export async function generateCustomerSku(knex) {
   const nextId = Number(row?.m || 0) + 1;
   return `CUS-${pad6(nextId)}`;
 }
+
+export async function generateOrderCode(knex) {
+  const row = await knex("orders").max({ m: "id" }).first();
+  const nextId = Number(row?.m || 0) + 1;
+  return `ORD-${pad6(nextId)}`;
+}

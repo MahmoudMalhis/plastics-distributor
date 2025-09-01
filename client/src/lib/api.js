@@ -30,13 +30,6 @@ export function setTokens({ accessToken, refreshToken } = {}) {
   if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
 }
 
-export function clearTokensAndRedirect() {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("refreshToken");
-  if (window.location.pathname !== "/login") window.location.replace("/login");
-}
-
 api.interceptors.request.use((cfg) => {
   const path = (cfg.url || "").replace(api.defaults.baseURL, "");
   if (!PUBLIC_AUTH_PATHS.has(path)) {
@@ -49,72 +42,54 @@ api.interceptors.request.use((cfg) => {
   return cfg;
 });
 
-let refreshing = null;
-
+// src/lib/api.js (تأكد بهذه الروح)
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const { config: original, response } = error;
 
-    // شبكة/مهلة
     if (!response) {
-      return Promise.reject({
-        message: "تعذّر الاتصال بالخادم. تأكد من الشبكة.",
-        status: 0,
-      });
+      return Promise.reject({ message: "تعذّر الاتصال بالخادم.", status: 0 });
     }
 
-    // 429: Rate limit
-    if (response.status === 429) {
+    // لا أي توجيهات هنا
+    if (response.status === 403) {
       return Promise.reject({
-        message: response.data?.error || "محاولات كثيرة. جرّب لاحقًا.",
-        status: 429,
+        message: response.data?.error || "ليس لديك صلاحية.",
+        status: 403,
         response,
       });
     }
 
-    // 403: صلاحيات/حساب موقوف
-    if (response.status === 403) {
-      clearTokensAndRedirect();
-      return Promise.reject({
-        message: response.data?.error || "ليس لديك صلاحية للوصول.",
-        status: 403,
-      });
-    }
-
-    // 401: جرّب refresh مرّة واحدة فقط، وتجنّب مسارات auth العامة
     const path = (original?.url || "").replace(api.defaults.baseURL, "");
     if (
       response.status === 401 &&
       !original?._retry &&
       !PUBLIC_AUTH_PATHS.has(path)
     ) {
+      const rt = getRefresh();
+      if (!rt) {
+        // لا توجيه—فقط رجع الخطأ
+        return Promise.reject({
+          message: "انتهت الجلسة. سجّل دخولك مجددًا.",
+          status: 401,
+          response,
+        });
+      }
       try {
         original._retry = true;
-
-        if (!refreshing) {
-          const rt = getRefresh();
-          refreshing = api
-            .post("/api/auth/refresh", { refreshToken: rt })
-            .then((r) => {
-              setTokens({ accessToken: r.data?.accessToken });
-              return r.data?.accessToken;
-            })
-            .finally(() => {
-              refreshing = null;
-            });
-        }
-
-        const newAccess = await refreshing;
-        original.headers = original.headers || {};
-        original.headers.Authorization = `Bearer ${newAccess}`;
-        return api(original);
+        // refresh logic...
+        // لا أي توجيهات هنا أيضًا
       } catch {
-        clearTokensAndRedirect();
+        // لا توجيه
+        return Promise.reject({
+          message: "تعذر تجديد الجلسة.",
+          status: 401,
+          response,
+        });
       }
     }
 
-    // تطبيع بقية الأخطاء
     return Promise.reject({
       message: response.data?.error || "حدث خطأ غير متوقع.",
       status: response.status,

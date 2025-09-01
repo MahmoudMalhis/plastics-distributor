@@ -57,9 +57,7 @@ export default function OrderDetails() {
                 <Info label="الحالة" value={renderStatus(order.status)} />
                 <Info
                   label="الإجمالي"
-                  value={`${Number(
-                    order.total || order.subtotal || 0
-                  ).toLocaleString()} ₪`}
+                  value={`${Number(order.total || 0).toLocaleString()} ₪`}
                 />
                 <Info
                   label="التاريخ"
@@ -93,8 +91,8 @@ export default function OrderDetails() {
                   ) : (
                     items.map((it, idx) => {
                       const total =
-                        Number(it.price || 0) *
-                        Number(it.qty || it.quantity || 0);
+                        Number(it.unit_price || 0) *
+                        Number(it.qty || it.qty || 0);
                       return (
                         <tr key={idx} className="border-t border-[#eef3f7]">
                           <td className="p-3">
@@ -118,11 +116,9 @@ export default function OrderDetails() {
                             </div>
                           </td>
                           <td className="p-3">
-                            {Number(it.price || 0).toLocaleString()} ₪
+                            {Number(it.unit_price || 0).toLocaleString()} ₪
                           </td>
-                          <td className="p-3">
-                            {Number(it.qty ?? it.quantity ?? 0)}
-                          </td>
+                          <td className="p-3">{Number(it.qty ?? 0)}</td>
                           <td className="p-3">{total.toLocaleString()} ₪</td>
                         </tr>
                       );
@@ -137,7 +133,7 @@ export default function OrderDetails() {
                 العودة لقائمة الطلبات
               </Link>
               <Link
-                to="/distributor/catalog"
+                // to={`/customers/${cust.id}`}
                 className="underline text-[#0d80f2]"
               >
                 العودة للكتالوج

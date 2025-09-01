@@ -54,7 +54,7 @@ export default function CustomerProfile() {
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto py-5">
-        <PageHeader title={`ملف العميل: ${customer.name}`}>
+        <PageHeader title={`ملف : ${customer.name}`}>
           <button
             className="relative inline-flex items-center justify-center bg-blue-600 text-white font-bold py-2.5 px-4 sm:px-5 rounded-lg shadow-md hover:bg-blue-700 transition cursor-pointer"
             onClick={() => navigate("/customers")}
@@ -136,7 +136,7 @@ export default function CustomerProfile() {
                       </td>
                       <td className="py-2 px-4">
                         <Link
-                          to={`/admin/orders/${o.id}`}
+                          to={`/orders/${o.id}`}
                           className="underline text-blue-600"
                         >
                           تفاصيل
