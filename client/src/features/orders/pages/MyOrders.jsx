@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { listMyOrders } from "../api/orders.api";
 import { Link } from "react-router-dom";
 import PageHeader from "../../../components/ui/PageHeader";
+import StatusBadge from "../components/StatusBadge";
 
 export default function MyOrders() {
   const [rows, setRows] = useState([]);
@@ -134,7 +135,7 @@ export default function MyOrders() {
                     <td className="p-3">
                       {formatDate(o.created_at || o.createdAt)}
                     </td>
-                    <td className="p-3">{renderStatus(o.status)}</td>
+                      <td className="py-2 px-4"><StatusBadge value={o.status} /></td>
                     <td className="p-3">
                       {Number(o.total || o.subtotal || 0).toLocaleString()} ₪
                     </td>
@@ -181,16 +182,6 @@ export default function MyOrders() {
       </div>
     </>
   );
-}
-
-function renderStatus(s) {
-  const map = {
-    draft: "مسودة",
-    submitted: "مرسلة",
-    fulfilled: "مكتملة",
-    cancelled: "ملغاة",
-  };
-  return map[s] || s || "—";
 }
 
 function formatDate(dt) {

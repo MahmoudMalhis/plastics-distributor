@@ -4,6 +4,7 @@ import { useParams, Link } from "react-router-dom";
 import { getOrder } from "../api/orders.api";
 import { imageUrl } from "../../products/api/products.api";
 import PageHeader from "../../../components/ui/PageHeader";
+import StatusBadge from "../components/StatusBadge";
 
 export default function OrderDetails() {
   const { id } = useParams();
@@ -54,7 +55,10 @@ export default function OrderDetails() {
             {/* ملخص */}
             <div className="bg-white border border-[#cedbe8] rounded-xl p-4 mb-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                <Info label="الحالة" value={renderStatus(order.status)} />
+                <Info
+                  label="الحالة"
+                  value={<StatusBadge value={order.status} />}
+                />
                 <Info
                   label="الإجمالي"
                   value={`${Number(order.total || 0).toLocaleString()} ₪`}
@@ -153,17 +157,6 @@ function Info({ label, value }) {
       <div className="text-[#0d141c] font-semibold">{value}</div>
     </div>
   );
-}
-
-function renderStatus(s) {
-  const map = {
-    pending: "قيد المراجعة",
-    confirmed: "مؤكد",
-    shipped: "تم الشحن",
-    completed: "مكتمل",
-    cancelled: "ملغي",
-  };
-  return map[s] || s || "—";
 }
 
 function formatDate(dt) {

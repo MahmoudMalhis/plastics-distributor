@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { getCustomer } from "../api/customers.api";
 import PageHeader from "../../../components/ui/PageHeader";
+import StatusBadge from "../../orders/components/StatusBadge";
 
 export default function CustomerProfile() {
   const { id } = useParams();
@@ -130,7 +131,7 @@ export default function CustomerProfile() {
                     <tr key={o.id} className="border-t border-[#eef3f7]">
                       <td className="py-2 px-4">{idx + 1}</td>
                       <td className="py-2 px-4">{formatDate(o.created_at)}</td>
-                      <td className="py-2 px-4">{o.status}</td>
+                      <td className="py-2 px-4"><StatusBadge value={o.status} /></td>
                       <td className="py-2 px-4">
                         {Number(o.total).toLocaleString()} ₪
                       </td>

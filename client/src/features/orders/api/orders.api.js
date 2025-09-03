@@ -93,3 +93,17 @@ export async function getOrder(orderId) {
     raw: data, // لو احتجته مستقبلًا
   };
 }
+
+// تحديث حالة طلب
+export async function updateOrderStatus(orderId, nextStatus, reason = "") {
+  // السيرفر عندك يطلب reason لأي تعديل على طلب Submitted
+  // نمرر سبب افتراضي إن لم يُعطَ سبب
+  const payload = { status: nextStatus };
+  if (!reason) {
+    payload.reason = `Status change to "${nextStatus}" from list`;
+  } else {
+    payload.reason = reason;
+  }
+  const { data } = await api.patch(`/api/orders/${orderId}`, payload);
+  return data;
+}

@@ -44,15 +44,9 @@ export default function Sidebar() {
       role: ["distributor"],
     },
     {
-      to: "/distributor/orders",
+      to: "/orders",
       label: "الطلبات",
       icon: "receipt_long",
-      role: ["distributor"],
-    },
-    {
-      to: "/distributor/orders/:id",
-      label: "تفاصيل الطلب",
-      icon: "receipt",
       role: ["distributor"],
     },
     {

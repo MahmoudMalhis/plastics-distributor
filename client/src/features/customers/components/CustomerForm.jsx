@@ -89,24 +89,20 @@ export default function CustomerForm({
           disabled
         />
       )}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <label className="flex flex-col">
-          <input
-            type="number"
-            step="0.0000001"
-            value={form.latitude ?? ""}
-            onChange={(e) =>
-              setField(
-                "latitude",
-                e.target.value === "" ? "" : Number(e.target.value)
-              )
-            }
-            className="h-11 rounded-lg border border-[#cedbe8] bg-slate-50 px-3"
-            placeholder="مثال: 32.2212345"
-          />
-        </label>
-        <label className="flex flex-col">
-          <input
+      <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-3">
+        <FormInput
+          label="الموقع"
+          type="number"
+          value={form.latitude ?? ""}
+          onChange={(e) =>
+            setField(
+              "latitude",
+              e.target.value === "" ? "" : Number(e.target.value)
+            )
+          }
+        />
+        <div className="mt-5">
+          <FormInput
             type="number"
             step="0.0000001"
             value={form.longitude ?? ""}
@@ -116,12 +112,9 @@ export default function CustomerForm({
                 e.target.value === "" ? "" : Number(e.target.value)
               )
             }
-            className="h-11 rounded-lg border border-[#cedbe8] bg-slate-50 px-3"
-            placeholder="مثال: 35.2612345"
           />
-        </label>
-
-        <div className="flex items-end gap-2">
+        </div>
+        <div className="flex items-end gap-2 mt-5">
           <button
             type="button"
             onClick={getMyLocation}
