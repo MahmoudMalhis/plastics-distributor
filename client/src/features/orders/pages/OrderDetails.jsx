@@ -1,16 +1,19 @@
 // client/src/features/orders/pages/OrderDetails.jsx
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { getOrder } from "../api/orders.api";
 import { imageUrl } from "../../products/api/products.api";
 import PageHeader from "../../../components/ui/PageHeader";
-import StatusBadge from "../components/StatusBadge";
+import StatusCell from "../components/StatusCell";
 
 export default function OrderDetails() {
   const { id } = useParams();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [rows, setRows] = useState([]);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
@@ -21,20 +24,29 @@ export default function OrderDetails() {
         const data = await getOrder(id);
         if (!cancelled) setOrder(data);
       } catch (e) {
-        if (!cancelled)
+        if (!cancelled) {
+          setRows(rows || []);
           setError(e?.response?.data?.error || "تعذر تحميل تفاصيل الطلب");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => (cancelled = true);
-  }, [id]);
+  }, [id, rows]);
 
   const items = order?.items || [];
 
   return (
     <>
-      <PageHeader title="تفاصيل الطلب"></PageHeader>
+      <PageHeader title="تفاصيل الطلب">
+        <button
+          className="relative inline-flex items-center justify-center bg-blue-600 text-white font-bold py-2.5 px-4 sm:px-5 rounded-lg shadow-md hover:bg-blue-700 transition cursor-pointer"
+          onClick={() => navigate("/orders")}
+        >
+          <span className="material-icons">keyboard_backspace</span>
+        </button>
+      </PageHeader>
       <div className="">
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-3 text-sm">
@@ -57,7 +69,26 @@ export default function OrderDetails() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                 <Info
                   label="الحالة"
-                  value={<StatusBadge value={order.status} />}
+                  value={
+                    <StatusCell
+                      order={order}
+                      onChanged={(next, updated) => {
+                        // حدّث الصف محليًا؛ إن رجّع السيرفر كائن كامل، استخدمه
+                        setRows((rows) =>
+                          rows.map((r) =>
+                            r.id === order.id
+                              ? {
+                                  ...r,
+                                  status: next,
+                                  ...(updated?.order || {}),
+                                }
+                              : r
+                          )
+                        );
+                      }}
+                      // askReason={true}  // فعّلها لو بدك prompt لسبب التغيير
+                    />
+                  }
                 />
                 <Info
                   label="الإجمالي"
@@ -72,7 +103,7 @@ export default function OrderDetails() {
             </div>
 
             {/* العناصر */}
-            <div className="bg-white border border-[#cedbe8] rounded-xl overflow-hidden">
+            <div className="bg-white border border-[#cedbe8] rounded-xl">
               <table className="w-full text-right">
                 <thead className="bg-slate-100 text-[#49739c]">
                   <tr>
@@ -130,18 +161,6 @@ export default function OrderDetails() {
                   )}
                 </tbody>
               </table>
-            </div>
-
-            <div className="flex justify-between items-center mt-4">
-              <Link to="/orders" className="underline text-[#0d80f2]">
-                العودة لقائمة الطلبات
-              </Link>
-              <Link
-                // to={`/customers/${cust.id}`}
-                className="underline text-[#0d80f2]"
-              >
-                العودة للكتالوج
-              </Link>
             </div>
           </>
         )}

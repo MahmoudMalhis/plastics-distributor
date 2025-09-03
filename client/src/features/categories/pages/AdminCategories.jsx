@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 // src/features/categories/pages/AdminCategories.jsx
 import { useEffect, useMemo, useState } from "react";
 import PageHeader from "../../../components/ui/PageHeader";

@@ -8,7 +8,9 @@ export default function DataTable({ head, children }) {
               {head.map((h, i) => (
                 <th
                   key={i}
-                  className={`py-3 px-4 sm:px-6 ${h.className || ""}`}
+                  className={`py-3 px-4 sm:px-6 text-center${
+                    h.className || ""
+                  }`}
                 >
                   {h.label}
                 </th>

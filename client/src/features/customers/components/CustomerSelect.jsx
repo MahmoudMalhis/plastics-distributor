@@ -34,7 +34,11 @@ export default function CustomerSelect({ selected, onSelect, onCreateNew }) {
         loadOptions={loadOptions}
         value={selected ? toOption(selected) : null}
         onChange={(option) => {
-          if (option?.data) onSelect(option.data);
+          if (!option) {
+            onSelect(null); // عند الضغط على x
+          } else if (option?.data) {
+            onSelect(option.data); // عند اختيار عميل
+          }
         }}
         placeholder="اختر عميلاً..."
         isClearable

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { imageUrl } from "../../products/api/products.api";
 import { createCustomer } from "../../customers/api/customers.api";
@@ -6,10 +6,11 @@ import {
   useCart,
   setQty,
   removeItem,
+  clearCustomer,
   clearCart,
   setCustomer,
 } from "../state/cart.store";
-import { createOrder } from "../api/orders.api";
+import { createOrder, listMyOrders } from "../api/orders.api";
 import QuantityInput from "../../../components/ui/QuantityInput";
 import PageHeader from "../../../components/ui/PageHeader";
 import CustomerForm from "../../customers/components/CustomerForm";
@@ -39,6 +40,7 @@ export default function CartEditor() {
   const [installmentPeriod, setInstallmentPeriod] = useState("weekly"); // weekly | monthly
   const [chequeNote, setChequeNote] = useState("");
   const [firstPayment, setFirstPayment] = useState("");
+  const [draftOrders, setDraftOrders] = useState([]);
 
   const canSubmit = useMemo(() => {
     if (items.length === 0) return false;
@@ -50,9 +52,6 @@ export default function CartEditor() {
       if (!Number.isFinite(amt) || amt <= 0) return false;
       if (!["weekly", "monthly"].includes(installmentPeriod)) return false;
     }
-    // chequeNote اختياري الآن؛ لو حاب تلزمه فعّل السطر التالي:
-    // if (paymentMethod === "cheque" && !chequeNote.trim()) return false;
-
     return true;
   }, [
     items,
@@ -62,6 +61,14 @@ export default function CartEditor() {
     installmentAmount,
     installmentPeriod,
   ]);
+
+  useEffect(() => {
+    async function fetchDraftOrders() {
+      const drafts = await listMyOrders({ status: "draft" });
+      setDraftOrders(drafts.rows || []);
+    }
+    fetchDraftOrders();
+  }, []);
 
   async function handleCreateCustomer(e) {
     if (e) e.preventDefault();
@@ -81,8 +88,6 @@ export default function CartEditor() {
       setCustSaving(false);
     }
   }
-
-  // في CartEditor.jsx - تحديث دالة submit
 
   const submit = async (e) => {
     e.preventDefault();
@@ -117,6 +122,7 @@ export default function CartEditor() {
 
       const orderId = res?.id || res?.order?.id;
       clearCart();
+      clearCustomer();
       if (orderId) navigate(`/orders/${orderId}`, { replace: true });
       else navigate(`/distributor/orders`, { replace: true });
     } catch (error) {
@@ -127,9 +133,51 @@ export default function CartEditor() {
     }
   };
 
+  const saveDraft = async () => {
+    if (items.length === 0) {
+      notify("warning", "السلة فارغة");
+      return;
+    }
+    try {
+      setSubmitting(true);
+      await createOrder({
+        items,
+        notes,
+        customer_id: customer?.id || null,
+        status: "draft", // ←←
+        payment_method: paymentMethod,
+        installment_amount:
+          paymentMethod === "installments"
+            ? Number(installmentAmount)
+            : undefined,
+        installment_period:
+          paymentMethod === "installments" ? installmentPeriod : undefined,
+        check_note: paymentMethod === "cheque" ? chequeNote : undefined,
+        first_payment: Number(firstPayment) || undefined,
+      });
+      // فضّي السلة + امسح العميل المختار
+      clearCart();
+      setCustomer(null); // ←← إزالة اسم العميل من الإختيار في الكاتالوج
+      notify("success", "تم الحفظ كمسودة");
+      navigate("/distributor/orders/drafts", { replace: true });
+    } catch (e) {
+      notify("error", e?.message || "تعذر حفظ المسودة");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <>
-      <PageHeader title={`طلبيات العميل: ${customer.name}`}>
+      <PageHeader title={`طلبيات العميل: ${customer?.name || ""}`}>
+        {draftOrders.length > 0 && (
+          <button
+            onClick={() => navigate("/distributor/orders/drafts")}
+            className="inline-flex items-center justify-center bg-gray-600 text-gray-100 font-semibold h-11 px-4 rounded-lg shadow hover:bg-blue-700 cursor-pointer"
+          >
+            <span className="material-icons">drafts</span>
+          </button>
+        )}
         <button
           onClick={() => navigate("/distributor/catalog")}
           className="inline-flex items-center justify-center bg-blue-600 text-white font-semibold h-11 px-4 rounded-lg shadow hover:bg-blue-700 cursor-pointer"
@@ -297,6 +345,14 @@ export default function CartEditor() {
                   }
                 >
                   إرسال الطلب
+                </button>
+                <button
+                  type="button"
+                  onClick={saveDraft}
+                  disabled={submitting || items.length === 0 || !customer?.id}
+                  className="h-12 rounded-xl font-bold border border-[#cedbe8] bg-white hover:bg-slate-50 disabled:opacity-60 cursor-pointer"
+                >
+                  حفظ كمسودة
                 </button>
                 <button
                   type="button"

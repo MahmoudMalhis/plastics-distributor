@@ -245,7 +245,10 @@ export default function CustomersList() {
             </tr>
           ) : (
             items.map((cust, idx) => (
-              <tr key={cust.id} className="border-t border-[#eef3f7]">
+              <tr
+                key={cust.id}
+                className="border-t border-[#eef3f7] text-center"
+              >
                 <td className="p-3">{(page - 1) * limit + idx + 1}</td>
                 <td className="p-3 font-bold">
                   <Link

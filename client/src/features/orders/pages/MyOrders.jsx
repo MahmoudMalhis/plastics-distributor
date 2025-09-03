@@ -1,9 +1,9 @@
 // client/src/features/orders/pages/MyOrders.jsx
 import { useEffect, useState } from "react";
 import { listMyOrders } from "../api/orders.api";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import PageHeader from "../../../components/ui/PageHeader";
-import StatusBadge from "../components/StatusBadge";
+import StatusCell from "../components/StatusCell";
 
 export default function MyOrders() {
   const [rows, setRows] = useState([]);
@@ -12,15 +12,10 @@ export default function MyOrders() {
   const [pageSize] = useState(10);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
+  const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const Title = ({ children }) => (
-    <h2 className="text-[#0d141c] text-[28px] font-bold leading-tight px-4 text-center pb-3 pt-5">
-      {children}
-    </h2>
-  );
 
   useEffect(() => {
     let cancelled = false;
@@ -57,7 +52,14 @@ export default function MyOrders() {
 
   return (
     <>
-      <PageHeader title="طلباتي"></PageHeader>
+      <PageHeader title="الطلبات">
+        <button
+          className="relative inline-flex items-center justify-center bg-blue-600 text-white font-bold py-2.5 px-4 sm:px-5 rounded-lg shadow-md hover:bg-blue-700 transition cursor-pointer"
+          onClick={() => navigate("/orders")}
+        >
+          <span className="material-icons">keyboard_backspace</span>
+        </button>
+      </PageHeader>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
         <label className="flex items-stretch rounded-lg col-span-2">
@@ -104,12 +106,13 @@ export default function MyOrders() {
           </div>
         )}
 
-        <div className="bg-white border border-[#cedbe8] rounded-xl overflow-hidden">
+        <div className="bg-white border border-[#cedbe8] rounded-xl">
           <table className="w-full text-right">
             <thead className="bg-slate-100 text-[#49739c]">
               <tr>
                 <th className="p-3">#</th>
                 <th className="p-3">التاريخ</th>
+                <th className="p-3">العميل</th>
                 <th className="p-3">الحالة</th>
                 <th className="p-3">الإجمالي</th>
                 <th className="p-3">تفاصيل</th>
@@ -129,13 +132,40 @@ export default function MyOrders() {
                   </td>
                 </tr>
               ) : (
-                rows.map((o) => (
+                rows.map((o, idx) => (
                   <tr key={o.id} className="border-t border-[#eef3f7]">
-                    <td className="p-3">{o.id}</td>
+                    <td className="p-3">{idx + 1}</td>
                     <td className="p-3">
                       {formatDate(o.created_at || o.createdAt)}
                     </td>
-                      <td className="py-2 px-4"><StatusBadge value={o.status} /></td>
+                    <td className="p-3">
+                      <Link
+                        to={`/customers/${o.customer_id}`}
+                        className="hover:text-blue-600 hover:underline"
+                      >
+                        {o.customer_name}
+                      </Link>
+                    </td>
+                    <td className="py-2 px-4">
+                      <StatusCell
+                        order={o}
+                        onChanged={(next, updated) => {
+                          // حدّث الصف محليًا؛ إن رجّع السيرفر كائن كامل، استخدمه
+                          setRows((rows) =>
+                            rows.map((r) =>
+                              r.id === o.id
+                                ? {
+                                    ...r,
+                                    status: next,
+                                    ...(updated?.order || {}),
+                                  }
+                                : r
+                            )
+                          );
+                        }}
+                        // askReason={true}  // فعّلها لو بدك prompt لسبب التغيير
+                      />
+                    </td>
                     <td className="p-3">
                       {Number(o.total || o.subtotal || 0).toLocaleString()} ₪
                     </td>

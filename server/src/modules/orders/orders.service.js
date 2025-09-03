@@ -171,11 +171,43 @@ export async function list(query = {}, currentUser) {
     search: query.search,
     page: Number(query.page || 1),
     limit: Number(query.limit || 20),
+    status: query.status ? String(query.status).toLowerCase() : undefined,
+    includeDrafts: Boolean(query.includeDrafts),
   };
   if (currentUser?.role === "distributor" && currentUser?.distributor_id) {
     opts.distributor_id = Number(currentUser.distributor_id);
   }
   return repo.listOrders(opts);
+}
+
+export async function remove(id, currentUser) {
+  const order = await repo.getOrderById(Number(id));
+  if (!order) {
+    const e = new Error("الطلب غير موجود");
+    e.status = 404;
+    throw e;
+  }
+
+  // لو المستخدِم موزّع، لازم يكون صاحب الطلب
+  if (
+    currentUser?.role === "distributor" &&
+    currentUser?.distributor_id &&
+    Number(order.distributor_id) !== Number(currentUser.distributor_id)
+  ) {
+    const e = new Error("صلاحيات غير كافية");
+    e.status = 403;
+    throw e;
+  }
+
+  // يُسمح بحذف المسودات فقط
+  if (String(order.status) !== "draft") {
+    const e = new Error("لا يمكن حذف الطلب إلا إذا كان مسودة");
+    e.status = 400;
+    throw e;
+  }
+
+  await repo.deleteOrderCascade(order.id);
+  return true;
 }
 
 export async function show(id) {

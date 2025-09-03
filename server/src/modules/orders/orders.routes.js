@@ -4,16 +4,11 @@ import { requireAuth } from "../../core/auth/rbac.js";
 
 const router = Router();
 
-// إنشاء طلب (مسودة أو إرسال)
 router.post("/", requireAuth, ctrl.create);
-
-// “طلباتي” أو جميع الطلبات (حسب الدور) + بحث/صفحات
 router.get("/", requireAuth, ctrl.list);
-
-// تفاصيل طلب
+router.get("/drafts", requireAuth, ctrl.listDrafts);
 router.get("/:id", requireAuth, ctrl.show);
-
-// تعديل طلب (يحتاج reason إذا كان Submitted)
 router.patch("/:id", requireAuth, ctrl.update);
+router.delete("/:id", requireAuth, ctrl.remove);
 
 export default router;

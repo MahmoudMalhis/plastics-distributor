@@ -21,6 +21,31 @@ export async function list(req, res, next) {
   }
 }
 
+export async function listDrafts(req, res, next) {
+  try {
+    const out = await svc.list(
+      { status: "draft", includeDrafts: true },
+      req.user
+    );
+    res.json(
+      Array.isArray(out?.rows) ? out : { items: out.rows, total: out.total }
+    );
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function remove(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    await svc.remove(id, req.user);
+    // لا محتوى
+    res.status(204).end();
+  } catch (e) {
+    next(e);
+  }
+}
+
 export async function show(req, res, next) {
   try {
     const id = Number(req.params.id);

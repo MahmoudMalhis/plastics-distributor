@@ -45,11 +45,21 @@ export async function getOrderById(id) {
   return db("orders").where({ id }).first();
 }
 
+export async function deleteOrderCascade(orderId) {
+  return db.transaction(async (trx) => {
+    await trx("order_items").where({ order_id: orderId }).del();
+    await trx("order_revisions").where({ order_id: orderId }).del();
+    await trx("orders").where({ id: orderId }).del();
+  });
+}
+
 export async function listOrders({
   search,
   page = 1,
   limit = 20,
   distributor_id,
+  status,
+  includeDrafts,
 }) {
   const base = db("orders as o")
     .leftJoin("customers as c", "c.id", "o.customer_id")
@@ -64,6 +74,8 @@ export async function listOrders({
     )
     .modify((qb) => {
       if (distributor_id) qb.where("o.distributor_id", distributor_id);
+      if (status) qb.where("o.status", status);
+      else if (!includeDrafts) qb.whereNot("o.status", "draft");
       if (search) {
         qb.where((w) => {
           w.where("c.name", "like", `%${search}%`)

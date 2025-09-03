@@ -15,6 +15,7 @@ import ProductDetails from "./features/products/pages/ProductDetails.jsx";
 import CustomersList from "./features/customers/pages/CustomersList.jsx";
 import CustomerProfile from "./features/customers/pages/CustomerProfile.jsx";
 import DistributorProfile from "./features/distributors/pages/DistributorProfile.jsx";
+import DraftOrders from "./features/orders/pages/DraftOrders.jsx";
 
 export default function App() {
   return (
@@ -47,6 +48,10 @@ export default function App() {
             <Route
               path="/distributor/products/:id"
               element={<ProductDetails />}
+            />
+            <Route
+              path="/distributor/orders/drafts"
+              element={<DraftOrders />}
             />
           </Route>
         </Route>

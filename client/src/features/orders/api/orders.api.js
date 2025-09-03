@@ -9,19 +9,16 @@ export async function createOrder({
   status = "submitted",
   payment_method = "cash",
   installment_amount,
-  installment_period, // "weekly" | "monthly"
+  installment_period,
   check_note,
 } = {}) {
   const payload = {
     customer_id,
-    status, // "draft" | "submitted"
-    payment_method, // "cash" | "installments" | "cheque"
-    // لو installments
+    status,
+    payment_method,
     installment_amount,
     installment_period,
-    // لو cheque
     check_note,
-    // عناصر الطلب: السيرفر هو اللي يحدد السعر
     items: (items || []).map((it) => ({
       product_id: it.productId,
       qty: it.qty,
@@ -29,7 +26,7 @@ export async function createOrder({
     notes,
   };
   const { data } = await api.post("/api/orders", payload);
-  return data; // غالبًا { order, items, ... }
+  return data;
 }
 
 /** قائمة طلباتي */
@@ -105,5 +102,19 @@ export async function updateOrderStatus(orderId, nextStatus, reason = "") {
     payload.reason = reason;
   }
   const { data } = await api.patch(`/api/orders/${orderId}`, payload);
+  return data;
+}
+
+export async function listDraftOrders({ page = 1, pageSize = 20 } = {}) {
+  const { data } = await api.get("/api/orders/drafts", {
+    params: { page, limit: pageSize },
+  });
+  return Array.isArray(data)
+    ? { rows: data, total: data.length }
+    : { rows: data.items || data.rows || [], total: Number(data.total || 0) };
+}
+
+export async function deleteOrder(id) {
+  const { data } = await api.delete(`/api/orders/${id}`);
   return data;
 }
