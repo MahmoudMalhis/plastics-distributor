@@ -164,3 +164,42 @@ export async function me(req, res, next) {
     next(e);
   }
 }
+
+export async function issueBootstrapToken(req, res, next) {
+  try {
+    const { raw, exp } = await svc.issueBootstrapToken(req);
+    // نحفظ التوكن الخام في كوكي HttpOnly
+    const ttlMs = new Date(exp).getTime() - Date.now();
+    res.cookie("bt", raw, { ...btCookieBase, maxAge: ttlMs });
+    // نعيد فقط تاريخ الانتهاء (لا نعيد التوكن في الـJSON)
+    return res.status(201).json({ expiresAt: exp.toISOString() });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+export async function setupInitialAdmin(req, res, next) {
+  try {
+    const { username, password } = req.body || {};
+    const result = await svc.setupInitialAdminViaToken(req, {
+      username,
+      password,
+    });
+
+    // نضع الـrefresh cookie كما في login
+    if (result?.refreshToken) {
+      const oneYearMs = 1000 * 60 * 60 * 24 * 365;
+      res.cookie(COOKIE_NAME, result.refreshToken, {
+        ...refreshCookieBase,
+        maxAge: oneYearMs,
+      });
+    }
+
+    const { refreshToken, ...rest } = result || {};
+    // إزالة كوكي bt بعد النجاح
+    res.clearCookie("bt", { ...btCookieBase });
+    return res.status(201).json(rest);
+  } catch (e) {
+    return next(e);
+  }
+}

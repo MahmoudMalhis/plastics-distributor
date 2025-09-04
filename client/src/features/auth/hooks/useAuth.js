@@ -1,6 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import useApiState from "../../../hooks/useApiState";
-import { checkInitialized, login as loginApi } from "../api/auth.api";
+import {
+  checkInitialized,
+  login as loginApi,
+  requestBootstrapToken,
+  setupInitialAdmin as setupInitialAdminApi,
+} from "../api/auth.api";
 
 /** يتحقق من حالة تهيئة النظام (هل يوجد admin أم لا) */
 export function useAuthInit() {
@@ -35,6 +40,26 @@ export function useAuthInit() {
   return { initialized, loading, error };
 }
 
+export function useBootstrapToken() {
+  const { loading, error, setLoading, setError, reset } = useApiState();
+
+  const issue = useCallback(async () => {
+    reset();
+    try {
+      setLoading(true);
+      const data = await requestBootstrapToken(); // يضع كوكي bt
+      return { ok: true, data };
+    } catch (e) {
+      setError(e?.message || "تعذر إصدار رمز التهيئة.");
+      return { ok: false };
+    } finally {
+      setLoading(false);
+    }
+  }, [reset, setError, setLoading]);
+
+  return { issue, loading, error };
+}
+
 /**
  * تهيئة المسؤول الأول باستخدام منطق الـ bootstrap فى الخادم.
  * تستدعى login مباشرةً عندما لا يوجد مستخدمون، ثم تخزن التوكنات فى localStorage.
@@ -46,31 +71,28 @@ export function useSetupInitialAdmin() {
     async ({ username, password, password2 }) => {
       reset();
       if (!username || !password || !password2) {
-        setError("الرجاء إدخال اسم المستخدم وكلمتي المرور.");
+        setError("أدخل اسم المستخدم وكلمتي المرور.");
         return { ok: false };
       }
       if (password !== password2) {
-        setError("كلمات المرور غير متطابقة.");
+        setError("كلمتا المرور غير متطابقتين.");
         return { ok: false };
       }
       try {
         setLoading(true);
-        const data = await loginApi({ username, password });
+        const data = await setupInitialAdminApi({ username, password });
         if (data?.accessToken)
           localStorage.setItem("accessToken", data.accessToken);
-        if (data?.refreshToken)
-          localStorage.setItem("refreshToken", data.refreshToken);
+        if (data?.user) localStorage.setItem("user", JSON.stringify(data.user));
         return { ok: true, data };
       } catch (e) {
-        setError(
-          e?.response?.data?.error || "حدث خطأ أثناء إنشاء حساب المسؤول."
-        );
+        setError(e?.message || "تعذر تهيئة النظام.");
         return { ok: false };
       } finally {
         setLoading(false);
       }
     },
-    [setLoading, setError, reset]
+    [reset, setError, setLoading]
   );
 
   return { setupInitialAdmin, loading, error };

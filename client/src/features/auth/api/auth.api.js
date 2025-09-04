@@ -5,6 +5,11 @@ export async function checkInitialized() {
   return data;
 }
 
+export async function requestBootstrapToken() {
+  const { data } = await api.post("/api/auth/bootstrap-token", null);
+  return data; // { expiresAt }
+}
+
 export async function login({ username, password }) {
   const { data } = await api.post(`/api/auth/login`, {
     username,

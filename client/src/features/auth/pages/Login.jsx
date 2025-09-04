@@ -225,7 +225,6 @@ export default function Login() {
                   </div>
                 </label>
               </div>
-
               {/* Password */}
               <div className="flex w-80 md:w-[480px] items-end gap-4 px-4 py-1">
                 <label className="flex flex-col min-w-40 flex-1">
@@ -319,7 +318,6 @@ export default function Login() {
                   {error && <div className="text-red-600 text-sm">{error}</div>}
                 </div>
               )}
-
               {/* Submit */}
               <div className="flex px-4 py-2">
                 <button

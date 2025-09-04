@@ -12,6 +12,8 @@ const router = Router();
 
 router.get("/me", requireAuth, ensureActive, ctrl.me);
 router.get("/initialized", ctrl.initialized);
+router.post("/bootstrap-token", strictRateLimiter, ctrl.issueBootstrapToken);
+router.post("/setup-initial-admin", strictRateLimiter, ctrl.setupInitialAdmin);
 router.post("/login", loginRateLimiter, ctrl.login);
 router.post("/refresh", ctrl.refresh);
 router.get(
@@ -27,4 +29,5 @@ router.post(
   strictRateLimiter,
   ctrl.changeMyPassword
 );
+
 export default router;

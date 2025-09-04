@@ -4,11 +4,8 @@ import { signAccess, signRefresh, verifyRefresh } from "../../core/auth/jwt.js";
 import { hasAnyUser } from "./auth.repo.js";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
+import * as bootstrapRepo from "./bootstrap.repo.js"; // ملف جديد ستضيفه بالخطوة 3
 
-/**
- * تسجيل الدخول: يولد access token و refresh token،
- * ويخزن تجزئة refresh token مع تاريخ انتهائه في قاعدة البيانات.
- */
 export async function login(username, password) {
   username = String(username || "").trim();
   password = String(password || "");
@@ -22,31 +19,9 @@ export async function login(username, password) {
   // BOOTSTRAP: عند انعدام المستخدمين، يُنشأ حساب admin تلقائيًا
   const total = await repo.countUsers();
   if (total === 0) {
-    const password_hash = await bcrypt.hash(password, 10);
-    const admin = await repo.createUser({
-      username,
-      password_hash,
-      role: "admin",
-      active: true,
-      must_change_password: true,
-    });
-    const accessToken = signAccess(admin);
-    const refreshToken = signRefresh(admin);
-
-    // تخزين refresh token في قاعدة البيانات
-    try {
-      const decoded = jwt.decode(refreshToken);
-      const expMs = decoded?.exp
-        ? decoded.exp * 1000
-        : Date.now() + 7 * 24 * 60 * 60 * 1000;
-      const expiresAt = new Date(expMs);
-      const tokenHash = hashToken(refreshToken);
-      await repo.addRefreshToken({ userId: admin.id, tokenHash, expiresAt });
-    } catch (e) {
-      // تجاهل أي خطأ في حالة عدم وجود جدول
-    }
-
-    return { accessToken, refreshToken, user: sanitize(admin) };
+    const err = new Error("system not initialized");
+    err.status = 403;
+    throw err;
   }
 
   // تسجيل الدخول العادي
@@ -94,10 +69,107 @@ export async function checkInitialized() {
   return { initialized: exists };
 }
 
-/**
- * تجديد الوصول: يتحقق من وجود refresh token في قاعدة البيانات وسريانه،
- * ثم يتحقق من توقيع JWT ويعيد access token جديد.
- */
+export async function issueBootstrapToken(req) {
+  // يمنع الإصدار إذا كان هناك مستخدمون بالفعل
+  const total = await repo.countUsers();
+  if (total > 0) {
+    const err = new Error("already initialized");
+    err.status = 409;
+    throw err;
+  }
+
+  // توكن واحد فعّال فقط
+  const active = await bootstrapRepo.getActiveToken();
+  if (active) {
+    const err = new Error("bootstrap token already issued");
+    err.status = 409;
+    throw err;
+  }
+
+  const ttlMin = Number(process.env.BOOTSTRAP_TTL_MIN || 15);
+  const exp = new Date(Date.now() + ttlMin * 60 * 1000);
+
+  const raw = crypto.randomBytes(32).toString("hex"); // 64 chars
+  const tokenHash = hashToken(raw);
+
+  const ip = getIp(req);
+  const ua = (req.headers["user-agent"] || "").toString();
+
+  await bootstrapRepo.createToken({ tokenHash, ip, ua, expiresAt: exp });
+  return { raw, exp };
+}
+
+export async function setupInitialAdminViaToken(req, { username, password }) {
+  username = String(username || "").trim();
+  password = String(password || "").trim();
+
+  if (!username || !password) {
+    const err = new Error("username/password required");
+    err.status = 400;
+    throw err;
+  }
+
+  // لا نسمح إن وُجد مستخدمون
+  const total = await repo.countUsers();
+  if (total > 0) {
+    const err = new Error("already initialized");
+    err.status = 409;
+    throw err;
+  }
+
+  // نقرأ توكن البوتستراب من كوكي HttpOnly "bt"
+  const raw = req.cookies?.bt;
+  if (!raw) {
+    const e = new Error("missing bootstrap token");
+    e.status = 403;
+    throw e;
+  }
+
+  const tokenHash = hashToken(raw);
+  const ip = getIp(req);
+  const ua = (req.headers["user-agent"] || "").toString();
+
+  const row = await bootstrapRepo.findValidToken({ tokenHash, ip, ua });
+  if (!row) {
+    const e = new Error("invalid or expired bootstrap token");
+    e.status = 403;
+    throw e;
+  }
+
+  // إنشاء الأدمن
+  const password_hash = await bcrypt.hash(password, 10);
+  const admin = await repo.createUser({
+    username,
+    password_hash,
+    role: "admin",
+    active: true,
+    must_change_password: true,
+  });
+
+  // إصدار التوكنات
+  const accessToken = signAccess(admin);
+  const refreshToken = signRefresh(admin);
+
+  // تخزين refresh token كتجزئة + تاريخ انتهاء
+  try {
+    const decoded = jwt.decode(refreshToken);
+    const expMs = decoded?.exp
+      ? decoded.exp * 1000
+      : Date.now() + 365 * 24 * 60 * 60 * 1000;
+    const expiresAt = new Date(expMs);
+    const rHash = hashToken(refreshToken);
+    await repo.addRefreshToken({
+      userId: admin.id,
+      tokenHash: rHash,
+      expiresAt,
+    });
+  } catch (_) {}
+
+  // تعليم التوكن كمستخدم
+  await bootstrapRepo.markUsed(row.id);
+
+  return { accessToken, refreshToken, user: sanitize(admin) };
+}
 export async function refresh(token) {
   if (!token) {
     const err = new Error("no token");
@@ -157,6 +229,14 @@ function sanitize(u) {
 
 function hashToken(raw) {
   return crypto.createHash("sha256").update(String(raw)).digest("hex");
+}
+
+function getIp(req) {
+  const xf = (req.headers["x-forwarded-for"] || "")
+    .toString()
+    .split(",")[0]
+    .trim();
+  return xf || req.ip || req.connection?.remoteAddress || "unknown";
 }
 
 export async function verifyPasswordToken(rawToken) {
