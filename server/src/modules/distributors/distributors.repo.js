@@ -1,7 +1,8 @@
-import knex from "../../db.js";
+// server/src/modules/distributors/distributors.repo.js
+import db from "../../db/knex.js";
 
 export function search({ search, active } = {}) {
-  const q = knex("distributors as s")
+  const q = db("distributors as s")
     .leftJoin("users as u", "u.distributor_id", "s.id")
     .select(
       "s.id",
@@ -18,24 +19,44 @@ export function search({ search, active } = {}) {
       "s.responsible_areas",
       "s.active",
       "s.created_at",
-      "u.username",
-      "u.must_change_password",
-      knex.raw(
-        "(select count(*) from orders o where o.distributor_id = s.id) as orders_count"
+      // ناخذ قيمة واحدة ثابتة من users لتفادي التكرار
+      db.raw("MAX(u.username) as username"),
+      db.raw("MAX(u.must_change_password) as must_change_password"),
+      db.raw(
+        "(SELECT COUNT(*) FROM orders o WHERE o.distributor_id = s.id) AS orders_count"
       )
+    )
+    .groupBy(
+      "s.id",
+      "s.name",
+      "s.phone",
+      "s.phone2",
+      "s.address",
+      "s.notes",
+      "s.id_image_url",
+      "s.vehicle_plate",
+      "s.vehicle_type",
+      "s.vehicle_model",
+      "s.company_vehicle",
+      "s.responsible_areas",
+      "s.active",
+      "s.created_at"
     );
 
   if (active !== undefined) {
-    q.where("s.active", !!active);
+    q.where("s.active", active ? 1 : 0);
   }
 
   if (search) {
-    const s = `%${String(search).trim()}%`;
+    const sTerm = `%${String(search).trim()}%`;
     q.where(function () {
-      this.where("s.name", "like", s).orWhere("s.phone", "like", s);
+      this.where("s.name", "like", sTerm)
+        .orWhere("s.phone", "like", sTerm)
+        .orWhere("s.phone2", "like", sTerm);
     });
   }
-  return q;
+
+  return q.orderBy("s.id", "desc");
 }
 
 export async function createDistributor({
@@ -51,7 +72,7 @@ export async function createDistributor({
   company_vehicle,
   responsible_areas,
 }) {
-  const inserted = await knex("distributors").insert({
+  const inserted = await db("distributors").insert({
     name,
     phone,
     phone2,
@@ -61,16 +82,17 @@ export async function createDistributor({
     vehicle_plate,
     vehicle_type,
     vehicle_model,
-    company_vehicle,
+    company_vehicle: company_vehicle ? 1 : 0,
     responsible_areas,
-    active: true,
+    active: 1,
   });
+
   const id = Array.isArray(inserted) ? inserted[0] : inserted;
-  return knex("distributors").where({ id }).first();
+  return db("distributors").where({ id }).first();
 }
 
 export async function getDistributorById(id) {
-  return knex("distributors as s")
+  return db("distributors as s")
     .leftJoin("users as u", "u.distributor_id", "s.id")
     .select(
       "s.id",
@@ -87,10 +109,26 @@ export async function getDistributorById(id) {
       "s.responsible_areas",
       "s.active",
       "s.created_at",
-      "u.username",
-      "u.must_change_password"
+      db.raw("MAX(u.username) as username"),
+      db.raw("MAX(u.must_change_password) as must_change_password")
     )
     .where("s.id", id)
+    .groupBy(
+      "s.id",
+      "s.name",
+      "s.phone",
+      "s.phone2",
+      "s.address",
+      "s.notes",
+      "s.id_image_url",
+      "s.vehicle_plate",
+      "s.vehicle_type",
+      "s.vehicle_model",
+      "s.company_vehicle",
+      "s.responsible_areas",
+      "s.active",
+      "s.created_at"
+    )
     .first();
 }
 
@@ -121,20 +159,21 @@ export async function updateDistributor(
   if (vehicle_plate !== undefined) patch.vehicle_plate = vehicle_plate;
   if (vehicle_type !== undefined) patch.vehicle_type = vehicle_type;
   if (vehicle_model !== undefined) patch.vehicle_model = vehicle_model;
-  if (company_vehicle !== undefined) patch.company_vehicle = !!company_vehicle;
+  if (company_vehicle !== undefined)
+    patch.company_vehicle = company_vehicle ? 1 : 0;
   if (responsible_areas !== undefined)
     patch.responsible_areas = responsible_areas;
-  if (active !== undefined) patch.active = !!active;
+  if (active !== undefined) patch.active = active ? 1 : 0;
 
-  await knex("distributors").where({ id }).update(patch);
-  return knex("distributors").where({ id }).first();
+  await db("distributors").where({ id }).update(patch);
+  return db("distributors").where({ id }).first();
 }
 
 export async function ensureUniqueUsername(base) {
   let candidate = base;
   let i = 1;
   while (true) {
-    const exists = await knex("users").where({ username: candidate }).first();
+    const exists = await db("users").where({ username: candidate }).first();
     if (!exists) return candidate;
     candidate = `${base}_${i++}`;
   }
@@ -148,7 +187,7 @@ export async function createUser({
   must_change_password,
   active,
 }) {
-  const inserted = await knex("users").insert({
+  const inserted = await db("users").insert({
     username,
     password_hash,
     role,
@@ -157,49 +196,47 @@ export async function createUser({
     active,
   });
   const id = Array.isArray(inserted) ? inserted[0] : inserted;
-  return knex("users").where({ id }).first();
+  return db("users").where({ id }).first();
 }
 
 export async function getUserByDistributorId(distributorId) {
-  return knex("users").where({ distributor_id: distributorId }).first();
+  return db("users").where({ distributor_id: distributorId }).first();
 }
 
 export async function getUserIdsByDistributor(distributorId) {
-  const rows = await knex("users")
+  const rows = await db("users")
     .where({ distributor_id: distributorId })
     .select("id");
   return rows.map((r) => r.id);
 }
 
 export async function revokeRefreshTokensForUsers(userIds) {
-  // احذف/أبطل كل ريفرش توكنز للمستخدمين
-  await knex("refresh_tokens").whereIn("user_id", userIds).del();
+  await db("refresh_tokens").whereIn("user_id", userIds).del();
 }
 
-// password_set_tokens: id, user_id, token_hash, expires_at, used_at NULL
 export async function insertPasswordSetToken({
   user_id,
   token_hash,
   expires_at,
 }) {
-  const inserted = await knex("password_set_tokens").insert({
+  const inserted = await db("password_set_tokens").insert({
     user_id,
     token_hash,
     expires_at,
   });
   const id = Array.isArray(inserted) ? inserted[0] : inserted;
-  return knex("password_set_tokens").where({ id }).first();
+  return db("password_set_tokens").where({ id }).first();
 }
 
 export async function setUsersActiveByDistributor(distributorId, active) {
-  const newValue = !!active;
-  await knex("users")
+  const newValue = active ? 1 : 0;
+  await db("users")
     .where({ distributor_id: distributorId })
     .update({ active: newValue });
 }
 
 export async function transferCustomers(fromDistributorId, toDistributorId) {
-  return knex("customers")
+  return db("customers")
     .where({ distributor_id: fromDistributorId })
     .update({ distributor_id: toDistributorId });
 }

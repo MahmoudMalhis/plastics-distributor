@@ -81,7 +81,6 @@ export async function getOne(req, res, next) {
   }
 }
 
-// آخر الملف
 export async function uploadIdImage(req, res, next) {
   try {
     const id = Number(req.params.id);
@@ -89,17 +88,6 @@ export async function uploadIdImage(req, res, next) {
     if (!req.file?.path) return res.status(400).json({ error: "لا توجد صورة" });
     const out = await svc.uploadIdImage(id, req.file.path);
     res.json(out);
-  } catch (e) {
-    next(e);
-  }
-}
-
-export async function show(req, res, next) {
-  try {
-    const id = Number(req.params.id);
-    const data = await svc.getOne(id);
-    if (!data) return res.status(404).json({ error: "not found" });
-    res.json(data);
   } catch (e) {
     next(e);
   }

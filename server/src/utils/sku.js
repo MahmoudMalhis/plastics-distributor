@@ -1,32 +1,52 @@
 // server/src/utils/sku.js
-
-// يحوّل رقم إلى 6 خانات: 15 => "000015"
-function pad6(n) {
-  return String(n).padStart(6, "0");
-}
+// مولّد SKU موحد يعتمد على أقصى رقم لاحقة موجودة حالياً لنفس الـ prefix
+// مثال الشكل: PRD-000001 , CUS-000123 , ORD-000045
 
 /**
- * توليد SKU للمنتج بصيغة PRD-000001
- * يقدّر nextId من MAX(id)+1 لتفادي NOT NULL/UNIQUE قبل الإدراج.
- * قد يحدث سباق نادر جدًا في الازدحام العالي — يكفي لحالتنا.
+ * يبني SKU متسلسل لشكل PREFIX-000001
+ * @param {import('knex').Knex} knex
+ * @param {object} opts
+ * @param {string} opts.table      - اسم الجدول
+ * @param {string} opts.prefix     - البادئة، مثل "PRD-"
+ * @param {string} [opts.column=sku] - اسم عمود الـSKU
+ * @param {number} [opts.pad=6]    - عدد الخانات مع الصفر
  */
+export async function generateSequentialSku(
+  knex,
+  { table, prefix, column = "sku", pad = 6 }
+) {
+  // نأخذ أكبر قيمة رقمية بعد البادئة: MAX(CAST(SUBSTRING(sku, LENGTH(prefix)+1) AS UNSIGNED))
+  const row = await knex(table)
+    .where(column, "like", `${prefix}%`)
+    .select(
+      knex.raw(`MAX(CAST(SUBSTRING(??, ? ) AS UNSIGNED)) AS maxNum`, [
+        column,
+        prefix.length + 1,
+      ])
+    )
+    .first();
+
+  const maxNum = Number(row?.maxNum || 0);
+  const next = maxNum + 1;
+  return `${prefix}${String(next).padStart(pad, "0")}`;
+}
+
+/** التوليد الخاص بالمنتجات */
 export async function generateProductSku(knex) {
-  const row = await knex("products").max({ m: "id" }).first();
-  const nextId = Number(row?.m || 0) + 1;
-  return `PRD-${pad6(nextId)}`;
+  return generateSequentialSku(knex, { table: "products", prefix: "PRD-" });
 }
 
-/**
- * توليد SKU للعميل: CUS-000001 (احتياطي لو احتجته لاحقًا)
- */
+/** التوليد الخاص بالعملاء */
 export async function generateCustomerSku(knex) {
-  const row = await knex("customers").max({ m: "id" }).first();
-  const nextId = Number(row?.m || 0) + 1;
-  return `CUS-${pad6(nextId)}`;
+  return generateSequentialSku(knex, { table: "customers", prefix: "CUS-" });
 }
 
+/** كود الطلبات (إن كنت تخزّنه في عمود sku أو code مشابه) */
 export async function generateOrderCode(knex) {
-  const row = await knex("orders").max({ m: "id" }).first();
-  const nextId = Number(row?.m || 0) + 1;
-  return `ORD-${pad6(nextId)}`;
+  // NOTE: غيّر column: "code" لو عمودك اسمه code وليس sku
+  return generateSequentialSku(knex, {
+    table: "orders",
+    prefix: "ORD-",
+    column: "code",
+  });
 }

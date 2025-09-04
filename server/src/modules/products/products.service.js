@@ -1,6 +1,6 @@
 // src/modules/products/products.service.js
 import db from "../../db/knex.js";
-import { generateProductSku } from "./sku.util.js";
+import { generateProductSku } from "../../utils/sku.js";
 import { setImage as repoSetImage } from "./products.repo.js"; // سنستخدمها لتحديث مسارات الصورة
 
 // ✅ إرجاع قائمة المنتجات مع الفلاتر (وبدون إظهار المؤرشف/غير النشط لغير الأدمن)

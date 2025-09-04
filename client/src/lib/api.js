@@ -2,7 +2,11 @@
 import axios from "axios";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
-export const api = axios.create({ baseURL: API_BASE, timeout: 20000 }); // + timeout
+export const api = axios.create({
+  baseURL: API_BASE,
+  withCredentials: true,
+  timeout: 20000,
+}); // + timeout
 
 // مسارات Auth العامة → لا تحتاج Authorization ولا محاولات refresh
 const PUBLIC_AUTH_PATHS = new Set([

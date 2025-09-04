@@ -2,9 +2,9 @@
 import sharp from "sharp";
 import path from "path";
 import fs from "fs/promises";
-import { ENV } from "../../config/env.js";
+import { env } from "../../config/env.js";
 
-const BASE = ENV.BASE_UPLOAD_DIR || "./uploads";
+const BASE = env.BASE_UPLOAD_DIR || "./uploads";
 const PRODUCTS_DIR = path.join(BASE, "products");
 
 // تأكد من وجود مجلد products

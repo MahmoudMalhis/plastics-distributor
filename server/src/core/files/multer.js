@@ -2,9 +2,9 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { ENV } from "../../config/env.js";
+import { env } from "../../config/env.js";
 
-const TMP_DIR = path.join(ENV.BASE_UPLOAD_DIR || "./uploads", "products");
+const TMP_DIR = path.join(env.BASE_UPLOAD_DIR || "./uploads", "products");
 
 // تأكد من وجود مجلد الرفع المؤقّت
 if (!fs.existsSync(TMP_DIR)) {
@@ -12,7 +12,7 @@ if (!fs.existsSync(TMP_DIR)) {
 }
 
 function fileFilter(req, file, cb) {
-  const allowed = (ENV.ALLOWED_IMAGE_TYPES || []).map((t) =>
+  const allowed = (env.ALLOWED_IMAGE_TYPES || []).map((t) =>
     t.trim().toLowerCase()
   );
   // تكييف الـ mimetype إلى امتداد (بسيط)
@@ -36,7 +36,7 @@ export const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: (ENV.MAX_IMAGE_MB || 2) * 1024 * 1024, // MB
+    fileSize: (env.MAX_IMAGE_MB || 2) * 1024 * 1024, // MB
   },
 });
 

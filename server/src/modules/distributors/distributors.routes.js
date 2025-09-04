@@ -29,5 +29,4 @@ router.post(
   singleImage,
   ctrl.uploadIdImage
 );
-router.get("/:id", requireAuth, requireAdmin, ctrl.show);
 export default router;

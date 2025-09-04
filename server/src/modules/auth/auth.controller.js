@@ -4,11 +4,33 @@ import bcrypt from "bcrypt";
 import * as repo from "./auth.repo.js";
 import * as distRepo from "../distributors/distributors.repo.js";
 
+/* === إعدادات كوكي الريفرِش (كما هي) === */
+const COOKIE_NAME = "rt";
+const isProd = (process.env.NODE_ENV || "development") === "production";
+const refreshCookieBase = {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: "lax",
+  path: "/api/auth",
+};
+
 export async function login(req, res) {
   try {
     const { username, password } = req.body || {};
     const result = await svc.login(username, password);
-    res.json(result);
+
+    // خزّن refreshToken في كوكي فقط (لا نُرجِعه في JSON)
+    if (result?.refreshToken) {
+      const oneYearMs = 1000 * 60 * 60 * 24 * 365;
+      res.cookie(COOKIE_NAME, result.refreshToken, {
+        ...refreshCookieBase,
+        maxAge: oneYearMs,
+      });
+    }
+
+    // 🚫 لا ترجع refreshToken
+    const { refreshToken, ...rest } = result || {};
+    res.json(rest);
   } catch (e) {
     res.status(e?.status || 500).json({ error: e?.message || "Server error" });
   }
@@ -25,9 +47,25 @@ export async function initialized(req, res, next) {
 
 export async function refresh(req, res) {
   try {
-    const { refreshToken } = req.body || {};
-    const result = await svc.refresh(refreshToken);
-    res.json(result);
+    // نقرأ من الكوكي أولاً، ونقبل body للتوافقية
+    const fromBody = req.body?.refreshToken;
+    const fromCookie = req.cookies?.[COOKIE_NAME];
+    const incomingRefresh = fromBody || fromCookie;
+
+    const result = await svc.refresh(incomingRefresh);
+
+    // دوّر الكوكي إذا رجعت خدمة الريفريش توكن جديد
+    if (result?.refreshToken) {
+      const oneYearMs = 1000 * 60 * 60 * 24 * 365;
+      res.cookie(COOKIE_NAME, result.refreshToken, {
+        ...refreshCookieBase,
+        maxAge: oneYearMs,
+      });
+    }
+
+    // 🚫 لا ترجع refreshToken
+    const { refreshToken, ...rest } = result || {};
+    res.json(rest);
   } catch (e) {
     res.status(e?.status || 401).json({ error: e?.message || "invalid token" });
   }
@@ -91,7 +129,6 @@ export async function changeMyPassword(req, res, next) {
       must_change_password: false,
     });
 
-    // أمان: إلغاء كل refresh tokens لإجبار إعادة تسجيل الدخول من الجلسات الأخرى
     await repo.revokeRefreshTokensForUser(authenticatedUserId);
 
     res.json({ ok: true, message: "تم تغيير كلمة المرور بنجاح" });
@@ -114,14 +151,13 @@ export async function me(req, res, next) {
       distributor = await distRepo.getDistributorById(dbUser.distributor_id);
     }
 
-    // ممكن دمج معلومات JWT مع معلومات قاعدة البيانات
     res.json({
       user: {
         ...safeUser,
-        role: req.user.role, // من الـ JWT
-        active: req.user.active, // من الـ JWT
+        role: req.user.role,
+        active: req.user.active,
         distributorId: req.user.distributorId,
-        distributor, // كائن الموزّع (اختياري)
+        distributor,
       },
     });
   } catch (e) {

@@ -1,6 +1,6 @@
 // src/config/cors.js
 import cors from "cors";
-import { ENV } from "./env.js";
+import { env } from "./env.js";
 
 /**
  * السماح للواجهة (Vite) بالوصول للـ API بما في ذلك هيدر Authorization.
@@ -10,7 +10,7 @@ import { ENV } from "./env.js";
  */
 const allowedOrigins = [
   "http://localhost:5173", // Vite dev
-  ENV.CLIENT_ORIGIN, // اختياري: من .env لو حاطه
+  env.CLIENT_ORIGIN, // اختياري: من .env لو حاطه
 ].filter(Boolean);
 
 const corsMw = cors({

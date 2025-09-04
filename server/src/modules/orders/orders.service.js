@@ -88,13 +88,6 @@ function normalizePayment(dto = {}) {
 
 // ----- إنشاء -----
 export async function create(payload, currentUser) {
-  console.log("=== ORDER CREATION DEBUG ===");
-  console.log("payload:", payload);
-  console.log("currentUser:", currentUser);
-  console.log("payload.distributor_id:", payload.distributor_id); // تصحيح الخطأ
-  console.log("currentUser.distributor_id:", currentUser?.distributor_id);
-  console.log("=== ORDER CREATION DEBUG ===");
-
   const status = String(payload.status || "draft").toLowerCase();
   if (!["draft", "submitted"].includes(status)) {
     const e = new Error("حالة الطلب غير صالحة");
