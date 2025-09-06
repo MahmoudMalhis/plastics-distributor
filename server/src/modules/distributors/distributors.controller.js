@@ -11,14 +11,36 @@ export async function list(req, res, next) {
 
 export async function create(req, res, next) {
   try {
-    const { name, phone, address, notes, username } = req.body;
-    const result = await svc.create({
+    const {
       name,
       phone,
+      phone2,
       address,
       notes,
       username,
+      id_image_url,
+      vehicle_plate,
+      vehicle_type,
+      vehicle_model,
+      company_vehicle,
+      responsible_areas,
+    } = req.body || {};
+
+    const result = await svc.create({
+      name,
+      phone,
+      phone2,
+      address,
+      notes,
+      username,
+      id_image_url,
+      vehicle_plate,
+      vehicle_type,
+      vehicle_model,
+      company_vehicle: !!company_vehicle, // مهم
+      responsible_areas,
     });
+
     res.status(201).json(result);
   } catch (e) {
     next(e);

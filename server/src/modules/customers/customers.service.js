@@ -183,3 +183,24 @@ export function getDetails(id) {
   if (!id) throw Object.assign(new Error("id مطلوب"), { status: 400 });
   return repo.getDetails(id);
 }
+
+export async function getStatement({ customerId, from, to, limit = 200 }) {
+  return ledgerRepo.getCustomerStatement({ customerId, from, to, limit });
+}
+
+export async function timeline(
+  customerId,
+  { page = 1, limit = 50 } = {},
+  user
+) {
+  // صلاحيات: الموزّع لا يرى إلا زبائنه
+  const details = await repo.getDetails(customerId);
+  if (!details) throw Object.assign(new Error("not found"), { status: 404 });
+  if (
+    user?.role === "distributor" &&
+    details.distributor_id !== user.distributor_id
+  ) {
+    throw Object.assign(new Error("forbidden"), { status: 403 });
+  }
+  return repo.getTimeline(customerId, { page, limit });
+}

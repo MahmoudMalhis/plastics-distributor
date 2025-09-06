@@ -51,6 +51,7 @@ export async function update(id, patch) {
 // إرجاع معلومات تفصيلية للعميل (عدد الطلبات والرصيد)
 export async function getDetails(id) {
   const customer = await db("customers as c")
+    .leftJoin("distributors as d", "d.id", "c.distributor_id") // ✅ انضمام لجلب الاسم
     .select(
       "c.id",
       "c.name",
@@ -59,6 +60,7 @@ export async function getDetails(id) {
       "c.address",
       "c.notes",
       "c.distributor_id",
+      db.raw("COALESCE(d.name, '') as distributor_name"), // ✅ اسم الموزّع
       "c.latitude",
       "c.longitude",
       "c.active",
@@ -66,6 +68,7 @@ export async function getDetails(id) {
     )
     .where("c.id", id)
     .first();
+
   if (!customer) return null;
 
   const orderCountRow = await db("orders")
@@ -97,4 +100,42 @@ export async function bulkReassign(fromDistributorId, toDistributorId) {
   return db("customers")
     .where({ distributor_id: fromDistributorId })
     .update({ distributor_id: toDistributorId });
+}
+
+export async function getById(id) {
+  return db("customers").select("id", "distributor_id").where({ id }).first();
+}
+
+export async function getTimeline(customerId, { page = 1, limit = 50 } = {}) {
+  const take = Math.max(1, Math.min(200, Number(limit) || 50));
+  const skip = Math.max(0, (Number(page) || 1) - 1) * take;
+
+  const orders = await db("orders")
+    .select(
+      db.raw("'order' as kind"),
+      "id as ref_id",
+      "code",
+      "status",
+      "total as amount",
+      "created_at"
+    )
+    .where({ customer_id: customerId });
+
+  const payments = await db("payments")
+    .select(
+      db.raw("'payment' as kind"),
+      "id as ref_id",
+      "order_id",
+      "method",
+      "note",
+      "amount",
+      db.raw("COALESCE(received_at, created_at) as created_at")
+    )
+    .where({ customer_id: customerId });
+
+  const events = [...orders, ...payments]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(skip, skip + take);
+
+  return { items: events, page, limit: take };
 }

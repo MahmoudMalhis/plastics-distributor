@@ -57,3 +57,46 @@ export async function show(req, res, next) {
     next(e);
   }
 }
+
+export async function getStatement(req, res, next) {
+  try {
+    const customerId = Number(req.params.id || 0);
+    if (!Number.isFinite(customerId)) {
+      return res.status(400).json({ error: "id غير صالح" });
+    }
+
+    if (req.user?.role === "distributor") {
+      const row = await customersRepo.getById(customerId);
+      if (!row || row.distributor_id !== req.user.distributorId) {
+        return res.status(403).json({ error: "forbidden" });
+      }
+    }
+
+    const { from, to, limit } = req.query || {};
+    const out = await svc.getStatement({
+      customerId,
+      from: from ? new Date(from) : null,
+      to: to ? new Date(to) : null,
+      limit: Number(limit) || 200,
+    });
+
+    return res.json(out);
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function timeline(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    const { page = 1, limit = 50 } = req.query || {};
+    const out = await svc.timeline(
+      id,
+      { page: Number(page), limit: Number(limit) },
+      normalizeUser(req.user)
+    );
+    res.json(out);
+  } catch (e) {
+    next(e);
+  }
+}
