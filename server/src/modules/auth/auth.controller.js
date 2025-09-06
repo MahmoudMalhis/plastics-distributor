@@ -13,7 +13,12 @@ const refreshCookieBase = {
   sameSite: "lax",
   path: "/api/auth",
 };
-
+const btCookieBase = {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: "lax",
+  path: "/api/auth",
+};
 export async function login(req, res) {
   try {
     const { username, password } = req.body || {};

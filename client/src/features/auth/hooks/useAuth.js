@@ -50,6 +50,9 @@ export function useBootstrapToken() {
       const data = await requestBootstrapToken(); // يضع كوكي bt
       return { ok: true, data };
     } catch (e) {
+      if (e?.response?.status === 409) {
+        return { ok: true, data: { note: "already issued" } };
+      }
       setError(e?.message || "تعذر إصدار رمز التهيئة.");
       return { ok: false };
     } finally {

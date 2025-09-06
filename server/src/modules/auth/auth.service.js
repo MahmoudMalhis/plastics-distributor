@@ -70,7 +70,6 @@ export async function checkInitialized() {
 }
 
 export async function issueBootstrapToken(req) {
-  // يمنع الإصدار إذا كان هناك مستخدمون بالفعل
   const total = await repo.countUsers();
   if (total > 0) {
     const err = new Error("already initialized");
@@ -78,22 +77,38 @@ export async function issueBootstrapToken(req) {
     throw err;
   }
 
-  // توكن واحد فعّال فقط
-  const active = await bootstrapRepo.getActiveToken();
-  if (active) {
-    const err = new Error("bootstrap token already issued");
-    err.status = 409;
-    throw err;
-  }
-
   const ttlMin = Number(process.env.BOOTSTRAP_TTL_MIN || 15);
   const exp = new Date(Date.now() + ttlMin * 60 * 1000);
 
-  const raw = crypto.randomBytes(32).toString("hex"); // 64 chars
+  const raw = crypto.randomBytes(32).toString("hex");
   const tokenHash = hashToken(raw);
 
   const ip = getIp(req);
   const ua = (req.headers["user-agent"] || "").toString();
+
+  const active = await bootstrapRepo.getActiveToken();
+  if (active) {
+    // لو نفس الجهاز (IP/UA) دوّر التوكن بدل 409
+    if (active.issued_ip === ip && active.issued_ua === ua) {
+      await bootstrapRepo.rotateToken(active.id, {
+        tokenHash,
+        ip,
+        ua,
+        expiresAt: exp,
+      });
+      return { raw, exp };
+    }
+    // في الديف سهّلها: ألغِ أي توكنات نشطة وأصدر جديد
+    if ((process.env.NODE_ENV || "development") !== "production") {
+      await bootstrapRepo.invalidateAllActive();
+      await bootstrapRepo.createToken({ tokenHash, ip, ua, expiresAt: exp });
+      return { raw, exp };
+    }
+    // في الإنتاج أبقِ 409
+    const err = new Error("bootstrap token already issued");
+    err.status = 409;
+    throw err;
+  }
 
   await bootstrapRepo.createToken({ tokenHash, ip, ua, expiresAt: exp });
   return { raw, exp };

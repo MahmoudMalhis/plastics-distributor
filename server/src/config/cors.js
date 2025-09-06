@@ -2,34 +2,18 @@
 import cors from "cors";
 import { env } from "./env.js";
 
-/**
- * السماح للواجهة (Vite) بالوصول للـ API بما في ذلك هيدر Authorization.
- * - origin: true (يعيد نفس Origin في الرد)
- * - allowedHeaders: تضمين Authorization مهم جدًا
- * - credentials: true لو بتستخدم كوكيز/سيشن، ممكن تخليها false لو لا تحتاج
- */
-const allowedOrigins = [
-  "http://localhost:5173", // Vite dev
-  env.CLIENT_ORIGIN, // اختياري: من .env لو حاطه
-].filter(Boolean);
+const allowedOrigins = ["http://localhost:5173", env.CLIENT_ORIGIN].filter(
+  Boolean
+);
 
-const corsMw = cors({
+export default cors({
   origin: (origin, cb) => {
-    // السماح من Postman/curl (بدون Origin) أو من origins المعرّفة
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
     return cb(new Error("Not allowed by CORS"));
   },
-  credentials: true, // فعّلها فقط إذا كنت ترسل كوكيز عبر المتصفح
+  credentials: true,
   methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization", // ← مهم لهيدر التوكن
-    "X-Requested-With",
-  ],
-  exposedHeaders: [
-    "Content-Disposition", // لو بترجع ملفات/تنزيلات
-  ],
-  optionsSuccessStatus: 204, // بعض المتصفحات تفضّل 204 للـ preflight
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  exposedHeaders: ["Content-Disposition"],
+  optionsSuccessStatus: 204,
 });
-
-export default corsMw;

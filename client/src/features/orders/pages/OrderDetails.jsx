@@ -103,7 +103,7 @@ export default function OrderDetails() {
             </div>
 
             {/* العناصر */}
-            <div className="bg-white border border-[#cedbe8] rounded-xl">
+            <div className="bg-white border border-[#cedbe8] rounded-xl overflow-hidden">
               <table className="w-full text-right">
                 <thead className="bg-slate-100 text-[#49739c]">
                   <tr>
@@ -133,6 +133,7 @@ export default function OrderDetails() {
                           <td className="p-3">
                             <div className="flex items-center gap-3">
                               <div className="w-16 h-12 bg-slate-100 rounded overflow-hidden">
+                                {console.log(it)}
                                 {it.image && (
                                   <img
                                     src={imageUrl(it.image)}

@@ -170,7 +170,6 @@ export default function DistributorsList() {
 
     try {
       if (form.id) {
-        // تحديث موزع موجود
         const updated = await updateDistributor(form.id, {
           name,
           phone: form.phone,
@@ -233,8 +232,6 @@ export default function DistributorsList() {
           [...prev, newDist].sort((a, b) => a.name.localeCompare(b.name, "ar"))
         );
       }
-
-      // إعادة تعيين النموذج وإغلاق النافذة
       setOpen(false);
       notify("success", "تم الحفظ بنجاح");
     } catch (error) {

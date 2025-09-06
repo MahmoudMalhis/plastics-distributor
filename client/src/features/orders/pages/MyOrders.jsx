@@ -106,7 +106,7 @@ export default function MyOrders() {
           </div>
         )}
 
-        <div className="bg-white border border-[#cedbe8] rounded-xl">
+        <div className="bg-white border border-[#cedbe8] rounded-xl overflow-hidden">
           <table className="w-full text-right">
             <thead className="bg-slate-100 text-[#49739c]">
               <tr>

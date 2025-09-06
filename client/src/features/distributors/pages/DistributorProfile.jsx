@@ -84,14 +84,8 @@ export default function DistributorProfile() {
             <Info label="الملاحظات" value={distributor.notes || "—"} />
             <Info label="الحالة" value={statusLabel} />
             <Info
-              label="يجب تغيير كلمة المرور"
-              value={
-                distributor.must_change_password
-                  ? "نعم"
-                  : distributor.must_change_password === false
-                  ? "لا"
-                  : "—"
-              }
+              label="الحساب مفعل؟"
+              value={distributor.must_change_password ? "لا" : "نعم"}
             />
           </div>
         </div>

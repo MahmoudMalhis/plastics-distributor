@@ -1,6 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuthInit, useLogin, useSetupInitialAdmin } from "../hooks/useAuth";
+import {
+  useAuthInit,
+  useLogin,
+  useSetupInitialAdmin,
+  useBootstrapToken,
+} from "../hooks/useAuth";
 import { useMemo } from "react";
 
 export default function Login() {
@@ -12,6 +17,12 @@ export default function Login() {
     error: setupError,
   } = useSetupInitialAdmin();
 
+  const {
+    issue: issueBootstrapToken,
+    loading: btLoading,
+    error: btError,
+  } = useBootstrapToken();
+  const issuedRef = useRef(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -20,14 +31,22 @@ export default function Login() {
   const [adminPassword, setAdminPassword] = useState("");
   const [adminPassword2, setAdminPassword2] = useState("");
   const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [showAdminPassword2, setShowAdminPassword2] = useState(false);
 
   const navigate = useNavigate();
 
-  const loading = initLoading || loginLoading || setupLoading;
+  const loading = initLoading || loginLoading || setupLoading || btLoading;
   const error = useMemo(
-    () => initError || loginError || setupError || "",
-    [initError, loginError, setupError]
+    () => initError || loginError || setupError || btError || "",
+    [initError, loginError, setupError, btError]
   );
+
+  useEffect(() => {
+    if (initialized === false && !issuedRef.current) {
+      issuedRef.current = true;
+      issueBootstrapToken();
+    }
+  }, [initialized, issueBootstrapToken]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -274,11 +293,11 @@ export default function Login() {
                   <div className="flex w-full items-stretch rounded-lg">
                     <button
                       type="button"
-                      onClick={() => setShowAdminPassword((s) => !s)}
+                      onClick={() => setShowAdminPassword2((s) => !s)}
                       className="text-[#49739c] flex border border-[#cedbe8] bg-slate-50 items-center justify-center pr-[15px] rounded-r-lg border-l-0 px-2"
-                      title={showAdminPassword ? "إخفاء" : "إظهار"}
+                      title={showAdminPassword2 ? "إخفاء" : "إظهار"}
                     >
-                      {showAdminPassword ? (
+                      {showAdminPassword2 ? (
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           width="24px"
@@ -303,7 +322,7 @@ export default function Login() {
                     </button>
                     <input
                       dir="rtl"
-                      type={showAdminPassword ? "text" : "password"}
+                      type={showAdminPassword2 ? "text" : "password"}
                       placeholder="تأكيد كلمة المرور"
                       className="flex w-full min-w-0 flex-1 rounded-lg text-[#0d141c] border border-[#cedbe8] bg-slate-50 h-14 placeholder:text-[#49739c] p-[15px] rounded-r-none border-r-0 pr-2 text-base focus:outline-none"
                       value={adminPassword2}
