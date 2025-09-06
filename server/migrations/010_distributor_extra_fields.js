@@ -1,3 +1,4 @@
+// 010_distributor_extra_fields.js
 export async function up(knex) {
   await knex.schema.alterTable("distributors", (table) => {
     table.string("phone2", 50).nullable();

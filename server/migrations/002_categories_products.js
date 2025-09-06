@@ -1,4 +1,4 @@
-// migrations/002_categories_products.js
+// 002_categories_products.js
 export async function up(knex) {
   await knex.schema.createTable("categories", (table) => {
     table.increments("id");

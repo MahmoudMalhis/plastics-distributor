@@ -1,6 +1,6 @@
+// 011_customer_location_fields.js
 export async function up(knex) {
   await knex.schema.alterTable("customers", (table) => {
-    // ربط العميل بموزع (nullable)
     table
       .integer("distributor_id")
       .unsigned()
@@ -8,7 +8,6 @@ export async function up(knex) {
       .inTable("distributors")
       .onDelete("SET NULL");
 
-    // إحداثيات الموقع (خط العرض وخط الطول)
     table.decimal("latitude", 10, 6);
     table.decimal("longitude", 10, 6);
   });

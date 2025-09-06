@@ -1,4 +1,4 @@
-// migrations/001_init_users_distributors.js
+// 001_init_users_distributors.js
 export async function up(knex) {
   await knex.schema.createTable("distributors", (table) => {
     table.increments("id");
@@ -25,6 +25,7 @@ export async function up(knex) {
       .onDelete("SET NULL");
     table.boolean("must_change_password").notNullable().defaultTo(false);
     table.boolean("active").notNullable().defaultTo(true);
+    table.timestamp("last_login_at").nullable();
     table.timestamp("created_at").defaultTo(knex.fn.now());
   });
 }

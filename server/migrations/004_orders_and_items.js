@@ -1,3 +1,4 @@
+// 004_orders_and_items.js
 export async function up(knex) {
   await knex.schema.createTable("orders", (table) => {
     table.increments("id");
@@ -42,10 +43,11 @@ export async function up(knex) {
       .defaultTo("draft");
 
     table.decimal("total", 12, 2).notNullable().defaultTo(0);
+    table.decimal("discount_amount", 12, 2).notNullable().defaultTo(0);
+    table.decimal("discount_percentage", 5, 2).notNullable().defaultTo(0);
     table.text("notes");
 
     table.enu("payment_method", ["cash", "installments", "checks"]).nullable();
-    table.integer("installment_plan_id").unsigned().nullable();
     table.string("check_note", 255);
 
     table.datetime("submitted_at").nullable();
@@ -81,35 +83,9 @@ export async function up(knex) {
     table.decimal("unit_price", 12, 2).notNullable();
     table.json("product_snapshot");
   });
-
-  await knex.schema.createTable("order_revisions", (table) => {
-    table.increments("id");
-    table
-      .integer("order_id")
-      .unsigned()
-      .notNullable()
-      .references("id")
-      .inTable("orders")
-      .onUpdate("CASCADE")
-      .onDelete("CASCADE");
-
-    table
-      .integer("editor_user_id")
-      .unsigned()
-      .notNullable()
-      .references("id")
-      .inTable("users")
-      .onUpdate("CASCADE")
-      .onDelete("RESTRICT");
-
-    table.text("reason").notNullable();
-    table.json("change_set");
-    table.timestamp("created_at").defaultTo(knex.fn.now());
-  });
 }
 
 export async function down(knex) {
-  await knex.schema.dropTableIfExists("order_revisions");
   await knex.schema.dropTableIfExists("order_items");
   await knex.schema.dropTableIfExists("orders");
 }

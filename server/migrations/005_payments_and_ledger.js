@@ -1,33 +1,5 @@
-// migrations/005_payments_installments_ledger.js
+// 005_payments_and_ledger.js
 export async function up(knex) {
-  await knex.schema.createTable("installment_plans", (table) => {
-    table.increments("id");
-    table
-      .integer("customer_id")
-      .unsigned()
-      .notNullable()
-      .references("id")
-      .inTable("customers")
-      .onUpdate("CASCADE")
-      .onDelete("RESTRICT");
-    table
-      .integer("order_id")
-      .unsigned()
-      .notNullable()
-      .references("id")
-      .inTable("orders")
-      .onUpdate("CASCADE")
-      .onDelete("CASCADE");
-    table.decimal("amount_per_installment", 12, 2).notNullable();
-    table.enu("frequency", ["weekly", "monthly"]).notNullable();
-    table.date("next_due_date").nullable();
-    table
-      .enu("status", ["active", "completed", "paused"])
-      .notNullable()
-      .defaultTo("active");
-    table.timestamp("created_at").defaultTo(knex.fn.now());
-  });
-
   await knex.schema.createTable("payments", (table) => {
     table.increments("id");
     table
@@ -83,5 +55,4 @@ export async function up(knex) {
 export async function down(knex) {
   await knex.schema.dropTableIfExists("ledger_entries");
   await knex.schema.dropTableIfExists("payments");
-  await knex.schema.dropTableIfExists("installment_plans");
 }

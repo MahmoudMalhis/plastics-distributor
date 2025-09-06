@@ -1,4 +1,4 @@
-// migrations/003_customers.js
+// 003_customers.js
 export async function up(knex) {
   await knex.schema.createTable("customers", (table) => {
     table.increments("id");
