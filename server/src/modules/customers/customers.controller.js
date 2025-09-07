@@ -1,6 +1,5 @@
 import * as svc from "./customers.service.js";
 import * as customersRepo from "./customers.repo.js";
-
 function normalizeUser(u) {
   if (!u) return u;
   const role =
@@ -12,7 +11,7 @@ function normalizeUser(u) {
   return {
     ...u,
     role,
-    distributor_id: u.distributor_id ?? u.distributorId ?? null,
+    distributor_id: u.distributor_id ?? null,
     active: u.active ?? true,
   };
 }
@@ -66,10 +65,9 @@ export async function getStatement(req, res, next) {
       return res.status(400).json({ error: "id غير صالح" });
     }
 
-    const _user = normalizeUser(req.user);
-    if (_user?.role === "distributor") {
+    if (req.user?.role === "distributor") {
       const row = await customersRepo.getById(customerId);
-      if (!row || row.distributor_id !== _user.distributor_id) {
+      if (!row || row.distributor_id !== req.user.distributorId) {
         return res.status(403).json({ error: "forbidden" });
       }
     }
@@ -99,6 +97,27 @@ export async function timeline(req, res, next) {
       normalizeUser(req.user)
     );
     res.json(out);
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function getCustomerOrders(req, res, next) {
+  try {
+    const customerId = Number(req.params.customerId);
+
+    if (!customerId || !Number.isFinite(customerId)) {
+      return res.status(400).json({ error: "معرف العميل غير صالح" });
+    }
+
+    const query = {
+      page: req.query.page,
+      limit: req.query.limit,
+      status: req.query.status,
+    };
+
+    const result = await svc.getCustomerOrders(customerId, query, req.user);
+    res.json(result);
   } catch (e) {
     next(e);
   }

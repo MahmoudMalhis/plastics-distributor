@@ -121,7 +121,7 @@ export default function AddPaymentModal({
 
         <div>
           <label className="block text-sm text-[#49739c] mb-1">
-            تاريخ الاستلام (اختياري)
+            تاريخ الاستلام
           </label>
           <input
             type="datetime-local"

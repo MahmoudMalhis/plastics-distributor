@@ -8,6 +8,14 @@ import CustomerTimeline from "../components/CustomerTimeline";
 import { notify } from "../../../utils/alerts";
 import { createPaymentForCustomer } from "../../payments/api/payments.api";
 
+function nowForDatetimeLocal() {
+  const d = new Date();
+  // نضبط الإزاحة لأن datetime-local لا يدعم المناطق الزمنية
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  // صيغة YYYY-MM-DDTHH:mm
+  return d.toISOString().slice(0, 16);
+}
+
 export default function CustomerProfile() {
   const { id } = useParams();
   const [rows, setRows] = useState([]);
@@ -25,6 +33,15 @@ export default function CustomerProfile() {
     note: "",
     received_at: "",
   });
+
+  useEffect(() => {
+    if (payOpen) {
+      setPayForm((f) => ({
+        ...f,
+        received_at: nowForDatetimeLocal(),
+      }));
+    }
+  }, [payOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,13 +108,18 @@ export default function CustomerProfile() {
     }
     try {
       setSavingPay(true);
+      const receivedIso = payForm.received_at
+        ? new Date(payForm.received_at).toISOString()
+        : null;
+
       await createPaymentForCustomer(Number(id), {
         amount: amt,
         method: payForm.method || "cash",
         reference: payForm.reference || null,
         note: payForm.note || null,
-        received_at: payForm.received_at || null,
+        received_at: receivedIso, // لو null السيرفر بيحط now
       });
+
       notify("success", "تم تسجيل الدفعة");
 
       // حدث بيانات العميل (الرصيد) وأعد تحميل التايملاين
@@ -120,22 +142,13 @@ export default function CustomerProfile() {
       setSavingPay(false);
     }
   }
-
-  function goToOrdersPage() {
-    // حدّد مسار قائمة الطلبات حسب الدور المخزّن
-    const stored = localStorage.getItem("userRole") || "";
-    const role = stored.toLowerCase();
-    const base = role === "admin" ? "/admin/orders" : "/distributor/orders";
-    // إن كانت لديك صفحة قائمة تدعم التصفية بـ customerId، مرّر بارام
-    navigate(`${base}?customerId=${id}`);
-  }
-
+  console.log(customer);
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto py-5">
         <PageHeader title={`ملف : ${customer.name}`}>
           <button
-            onClick={goToOrdersPage}
+            onClick={() => navigate(`/orders/customer/${customer.id}`)}
             className="inline-flex items-center gap-2 px-4 h-11 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 cursor-pointer"
           >
             <span className="material-icons">receipt_long</span>
@@ -233,66 +246,6 @@ export default function CustomerProfile() {
             </div>
           </div>
         </div>
-
-        {/* قائمة الطلبات */}
-        {/* <div className="mt-8 bg-white rounded-xl shadow-lg p-6">
-          <h3 className="text-xl font-bold mb-3">طلباته</h3>
-          {orders.length === 0 ? (
-            <div className="text-[#49739c]">لا توجد طلبات</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-slate-100 text-[#49739c]">
-                  <tr>
-                    <th className="py-2 px-4 text-right">#</th>
-                    <th className="py-2 px-4 text-right">التاريخ</th>
-                    <th className="py-2 px-4 text-right">الحالة</th>
-                    <th className="py-2 px-4 text-right">الإجمالي</th>
-                    <th className="py-2 px-4 text-right">عرض</th>
-                  </tr>
-                </thead>
-                <tbody className="text-[#0d141c]">
-                  {orders.map((o, idx) => (
-                    <tr key={o.id} className="border-t border-[#eef3f7]">
-                      <td className="py-2 px-4">{idx + 1}</td>
-                      <td className="py-2 px-4">{formatDate(o.created_at)}</td>
-                      <td className="py-2 px-4">
-                        <StatusCell
-                          order={o}
-                          onChanged={(next, updated) => {
-                            setRows((rows) =>
-                              rows.map((r) =>
-                                r.id === o.id
-                                  ? {
-                                      ...r,
-                                      status: next,
-                                      ...(updated?.order || {}),
-                                    }
-                                  : r
-                              )
-                            );
-                          }}
-                          // askReason={true}  // فعّلها لو بدك prompt لسبب التغيير
-                        />
-                      </td>
-                      <td className="py-2 px-4">
-                        {Number(o.total).toLocaleString()} ₪
-                      </td>
-                      <td className="py-2 px-4">
-                        <Link
-                          to={`/orders/${o.id}`}
-                          className="underline text-blue-600"
-                        >
-                          تفاصيل
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div> */}
         <div className="mt-8">
           <CustomerTimeline customerId={Number(id)} key={timelineKey} />
         </div>
@@ -408,14 +361,4 @@ function Info({ label, value, className }) {
       </div>
     </div>
   );
-}
-
-function formatDate(dt) {
-  try {
-    const d = new Date(dt);
-    if (isNaN(d.getTime())) return "—";
-    return d.toLocaleString("ar-EG");
-  } catch {
-    return "—";
-  }
 }

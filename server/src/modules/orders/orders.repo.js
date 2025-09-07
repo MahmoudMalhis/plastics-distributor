@@ -193,3 +193,58 @@ export async function getOrderFull(id) {
       : null,
   };
 }
+
+export async function listOrdersByCustomer(
+  customerId,
+  { page = 1, limit = 20, status } = {}
+) {
+  const base = db("orders as o")
+    .leftJoin("order_items as oi", "oi.order_id", "o.id")
+    .leftJoin("products as p", "p.id", "oi.product_id")
+    .where("o.customer_id", customerId)
+    .select(
+      "o.id",
+      "o.code",
+      "o.created_at",
+      "o.status",
+      "o.total",
+      "o.payment_method",
+      "o.notes",
+      db.raw("COUNT(DISTINCT oi.id) as items_count"),
+      db.raw(`
+        JSON_ARRAYAGG(
+          JSON_OBJECT(
+            'product_id', oi.product_id,
+            'product_name', p.name,
+            'qty', oi.qty,
+            'unit_price', oi.unit_price
+          )
+        ) as items
+      `)
+    )
+    .groupBy("o.id")
+    .modify((qb) => {
+      if (status) qb.where("o.status", status);
+    })
+    .orderBy("o.created_at", "desc");
+
+  const rows = await base
+    .clone()
+    .offset((page - 1) * limit)
+    .limit(limit);
+
+  const [{ count }] = await db("orders")
+    .where({ customer_id: customerId })
+    .modify((qb) => {
+      if (status) qb.where("status", status);
+    })
+    .count({ count: "*" });
+
+  return {
+    rows: rows.map((row) => ({
+      ...row,
+      items: row.items ? JSON.parse(row.items) : [],
+    })),
+    total: Number(count || 0),
+  };
+}

@@ -326,3 +326,89 @@ export async function update(id, payload, currentUser) {
 function dbNow() {
   return new Date().toISOString();
 }
+
+export async function getCustomerOrders(customerId, query = {}, currentUser) {
+  // التحقق من الصلاحيات
+  if (!currentUser) {
+    const e = new Error("غير مصرح");
+    e.status = 401;
+    throw e;
+  }
+
+  // جلب معلومات العميل للتحقق من الصلاحيات
+  const customer = await db("customers").where({ id: customerId }).first();
+
+  if (!customer) {
+    const e = new Error("العميل غير موجود");
+    e.status = 404;
+    throw e;
+  }
+
+  // التحقق من صلاحية عرض طلبات هذا العميل
+  const isAdmin = currentUser.role === "admin";
+  const isOwnerDistributor =
+    currentUser.role === "distributor" &&
+    currentUser.distributor_id &&
+    Number(customer.distributor_id) === Number(currentUser.distributor_id);
+
+  if (!isAdmin && !isOwnerDistributor) {
+    const e = new Error("ليس لديك صلاحية عرض طلبات هذا العميل");
+    e.status = 403;
+    throw e;
+  }
+
+  // جلب الطلبات
+  const opts = {
+    page: Number(query.page || 1),
+    limit: Number(query.limit || 20),
+    status: query.status ? String(query.status).toLowerCase() : undefined,
+  };
+
+  // استخدم الدالة البسيطة (أكثر توافقاً)
+  const result = await repo.listOrdersByCustomerSimple(customerId, opts);
+
+  // إضافة معلومات إضافية للطلبات
+  const enhancedRows = await Promise.all(
+    result.rows.map(async (order) => {
+      // جلب معلومات خطة التقسيط إن وجدت
+      let installmentPlan = null;
+      if (order.installment_plan_id) {
+        installmentPlan = await db("installment_plans")
+          .where({ id: order.installment_plan_id })
+          .first();
+      }
+
+      // جلب إجمالي المدفوعات للطلب
+      const paymentsResult = await db("payments")
+        .where({ order_id: order.id })
+        .sum({ total_paid: "amount" })
+        .first();
+
+      const totalPaid = Number(paymentsResult?.total_paid || 0);
+      const remaining = Number(order.total) - totalPaid;
+
+      return {
+        ...order,
+        installment_plan: installmentPlan,
+        total_paid: totalPaid,
+        remaining_amount: remaining,
+        is_fully_paid: remaining <= 0,
+      };
+    })
+  );
+
+  return {
+    customer: {
+      id: customer.id,
+      name: customer.name,
+      customer_sku: customer.customer_sku,
+    },
+    orders: enhancedRows,
+    pagination: {
+      page: opts.page,
+      limit: opts.limit,
+      total: result.total,
+      pages: Math.ceil(result.total / opts.limit),
+    },
+  };
+}

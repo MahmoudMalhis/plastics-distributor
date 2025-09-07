@@ -9,7 +9,7 @@ import {
   updateCustomer,
 } from "../api/customers.api";
 import CustomerForm from "../components/CustomerForm";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function CustomersList() {
   const [search, setSearch] = useState("");
@@ -32,6 +32,7 @@ export default function CustomersList() {
     latitude: null,
     longitude: null,
   });
+  const navigate = useNavigate();
 
   const role = localStorage.getItem("userRole");
   const isAdmin = role === "admin";
@@ -277,6 +278,14 @@ export default function CustomersList() {
                   )}
                 </td>
                 <td className="p-3 text-center flex justify-center gap-3">
+                  <button
+                    onClick={() => navigate(`/orders/${cust.id}`)}
+                    className="inline-flex items-center justify-center transition shadow-sm cursor-pointer
+                                rounded-full bg-indigo-100 text-indigo-600 hover:bg-indigo-200
+                                w-9 h-9 text-[20px]"
+                  >
+                    <span className="material-icons">receipt_long</span>
+                  </button>
                   <button
                     onClick={() => openEdit(cust)}
                     className="inline-flex items-center justify-center transition shadow-sm cursor-pointer

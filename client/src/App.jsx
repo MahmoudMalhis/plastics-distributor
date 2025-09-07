@@ -65,6 +65,7 @@ export default function App() {
             <Route path="/customers/:id" element={<CustomerProfile />} />
             <Route path="/orders" element={<MyOrders />} />
             <Route path="/orders/:id" element={<OrderDetails />} />
+            <Route path="/orders/customer/:id" element={<OrderDetails />} />
           </Route>
         </Route>
         <Route path="/unauthorized" element={<Unauthorized />} />
