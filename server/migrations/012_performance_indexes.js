@@ -37,6 +37,7 @@ export async function down(knex) {
     table.dropIndex(["distributor_id"], "orders_dist_idx");
     table.dropIndex(["customer_id"], "orders_cust_idx");
     table.dropIndex(["created_at"], "orders_created_idx");
+    table.dropIndex(["installment_plan_id"], "orders_plan_idx");
   });
 
   await knex.schema.alterTable("products", (table) => {

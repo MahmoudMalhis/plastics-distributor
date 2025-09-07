@@ -1,7 +1,7 @@
 import db from "../../db/knex.js";
 
 // البحث أو جلب العملاء مع دعم التصفية والصفحات
-export async function list({ search, page, limit } = {}) {
+export async function list({ search, page, limit, distributor_id } = {}) {
   const qb = db("customers as c").select(
     "c.id",
     "c.name",
@@ -15,6 +15,11 @@ export async function list({ search, page, limit } = {}) {
     "c.active",
     "c.created_at"
   );
+
+  if (distributor_id != null) {
+    qb.where("c.distributor_id", Number(distributor_id));
+  }
+
   if (search) {
     const term = String(search).toLowerCase();
     const like = `%${term.replace(/[%_]/g, "\\$&")}%`;
@@ -49,9 +54,9 @@ export async function update(id, patch) {
 }
 
 // إرجاع معلومات تفصيلية للعميل (عدد الطلبات والرصيد)
-export async function getDetails(id) {
+export async function getDetailsWithDistributor(id) {
   const customer = await db("customers as c")
-    .leftJoin("distributors as d", "d.id", "c.distributor_id") // ✅ انضمام لجلب الاسم
+    .leftJoin("distributors as d", "d.id", "c.distributor_id")
     .select(
       "c.id",
       "c.name",
@@ -60,17 +65,18 @@ export async function getDetails(id) {
       "c.address",
       "c.notes",
       "c.distributor_id",
-      db.raw("COALESCE(d.name, '') as distributor_name"), // ✅ اسم الموزّع
       "c.latitude",
       "c.longitude",
       "c.active",
-      "c.created_at"
+      "c.created_at",
+      db.raw("COALESCE(d.name, NULL) as distributor_name")
     )
     .where("c.id", id)
     .first();
 
   if (!customer) return null;
 
+  // عدد الطلبات والرصيد كما كان
   const orderCountRow = await db("orders")
     .where({ customer_id: id })
     .count({ count: "id" })
@@ -102,40 +108,62 @@ export async function bulkReassign(fromDistributorId, toDistributorId) {
     .update({ distributor_id: toDistributorId });
 }
 
+export function getCustomerBasic(id) {
+  return db("customers").select("id", "distributor_id").where({ id }).first();
+}
 export async function getById(id) {
   return db("customers").select("id", "distributor_id").where({ id }).first();
 }
 
-export async function getTimeline(customerId, { page = 1, limit = 50 } = {}) {
-  const take = Math.max(1, Math.min(200, Number(limit) || 50));
-  const skip = Math.max(0, (Number(page) || 1) - 1) * take;
+export async function getTimeline({ customerId, page = 1, limit = 20 }) {
+  const take = Math.max(1, Number(limit));
+  const offset = (Math.max(1, Number(page)) - 1) * take;
+  const limitPlus = take + 1;
 
-  const orders = await db("orders")
-    .select(
-      db.raw("'order' as kind"),
-      "id as ref_id",
-      "code",
-      "status",
-      "total as amount",
-      "created_at"
-    )
-    .where({ customer_id: customerId });
+  // نبني سب-كويري مدمج
+  const subquery = db
+    .select("*")
+    .from(function () {
+      // فواتير
+      this.select(
+        db.raw("o.created_at as ts"),
+        db.raw("'order' as kind"),
+        db.raw("o.id as id"),
+        db.raw("o.code as ref"),
+        db.raw("o.total as total"),
+        db.raw("o.status as status"),
+        db.raw("NULL as amount"),
+        db.raw("NULL as method"),
+        db.raw("NULL as note")
+      )
+        .from("orders as o")
+        .where("o.customer_id", customerId)
+        // ندمج معها الدفعات
+        .unionAll(function () {
+          this.select(
+            db.raw("p.received_at as ts"),
+            db.raw("'payment' as kind"),
+            db.raw("p.id as id"),
+            db.raw("CONCAT('PMT-', LPAD(p.id, 6, '0')) as ref"),
+            db.raw("NULL as total"),
+            db.raw("NULL as status"),
+            db.raw("p.amount as amount"),
+            db.raw("p.method as method"),
+            db.raw("p.note as note")
+          )
+            .from("payments as p")
+            .where("p.customer_id", customerId);
+        })
+        .as("t");
+    })
+    .as("timeline");
 
-  const payments = await db("payments")
-    .select(
-      db.raw("'payment' as kind"),
-      "id as ref_id",
-      "order_id",
-      "method",
-      "note",
-      "amount",
-      db.raw("COALESCE(received_at, created_at) as created_at")
-    )
-    .where({ customer_id: customerId });
+  const rows = await db
+    .select("*")
+    .from(subquery)
+    .orderBy("ts", "desc")
+    .limit(limitPlus)
+    .offset(offset);
 
-  const events = [...orders, ...payments]
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    .slice(skip, skip + take);
-
-  return { items: events, page, limit: take };
+  return rows;
 }

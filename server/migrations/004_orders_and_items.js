@@ -48,6 +48,7 @@ export async function up(knex) {
     table.text("notes");
 
     table.enu("payment_method", ["cash", "installments", "checks"]).nullable();
+    table.integer("installment_plan_id").unsigned().nullable();
     table.string("check_note", 255);
 
     table.datetime("submitted_at").nullable();

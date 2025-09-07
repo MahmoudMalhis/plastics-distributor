@@ -1,21 +1,40 @@
 import db from "../../db/knex.js";
 
 // ===== Payments =====
-export async function insertPayment(
-  trx,
-  { customer_id, order_id, amount, method, note, received_at, created_by }
-) {
-  const [id] = await trx("payments").insert({
+export async function insertPayment({
+  customer_id,
+  amount,
+  method,
+  reference,
+  note,
+  received_at,
+  created_by_user_id,
+  distributor_id,
+}) {
+  const base = {
     customer_id,
-    order_id,
     amount,
-    method,
-    note,
-    received_at,
-    created_by,
-  });
-  const insertedId = typeof id === "object" ? id?.insertId : id;
-  return trx("payments").where({ id: insertedId }).first();
+    received_at: received_at || db.fn.now(),
+    created_by_user_id,
+    distributor_id,
+    created_at: db.fn.now(),
+  };
+
+  const full = { ...base, method, reference, note };
+
+  try {
+    const inserted = await db("payments").insert(full);
+    const id = Array.isArray(inserted) ? inserted[0] : inserted;
+    return db("payments").where({ id }).first();
+  } catch (e) {
+    // في حال الأعمدة الاختيارية غير موجودة
+    if (String(e?.code) === "ER_BAD_FIELD_ERROR") {
+      const inserted = await db("payments").insert(base);
+      const id = Array.isArray(inserted) ? inserted[0] : inserted;
+      return db("payments").where({ id }).first();
+    }
+    throw e;
+  }
 }
 
 // ===== Ledger helpers =====
@@ -93,4 +112,28 @@ export async function tryCompleteInstallmentPlanIfSettled(trx, { order_id }) {
     return "completed";
   }
   return "active";
+}
+
+// اختياري: إنشاء قيد دفتر مقابل الدفعة
+export async function insertLedgerForPayment(payment, trx = db) {
+  const has = await trx.schema.hasTable("ledger_entries");
+  if (!has) return null;
+  const last = await trx("ledger_entries")
+    .where({ customer_id: payment.customer_id })
+    .orderBy("id", "desc")
+    .first("balance_after");
+  const balance_after =
+    Number(last?.balance_after || 0) - Number(payment.amount || 0);
+  const [id] = await trx("ledger_entries").insert({
+    customer_id: payment.customer_id,
+    credit: payment.amount,
+    debit: 0,
+    reference_table: "payments",
+    reference_id: payment.id,
+    note: payment.note || null,
+    balance_after,
+    created_at: trx.fn.now(),
+  });
+  const insertedId = typeof id === "object" ? id?.insertId : id;
+  return trx("ledger_entries").where({ id: insertedId }).first();
 }

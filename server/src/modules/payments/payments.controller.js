@@ -20,3 +20,18 @@ export async function createPayment(req, res, next) {
     next(e);
   }
 }
+
+export async function createForCustomer(req, res, next) {
+  try {
+    const customerId = Number(req.params.id);
+    const { amount, method, reference, note, received_at } = req.body || {};
+    const out = await svc.createForCustomer(
+      customerId,
+      { amount, method, reference, note, received_at },
+      req.user
+    );
+    res.status(201).json(out);
+  } catch (e) {
+    next(e);
+  }
+}

@@ -27,3 +27,13 @@ export async function getCustomer(id) {
   const { data } = await api.get(`/api/customers/${id}`);
   return data;
 }
+
+export async function getCustomerTimeline(
+  customerId,
+  { page = 1, limit = 20 } = {}
+) {
+  const { data } = await api.get(`/api/customers/${customerId}/timeline`, {
+    params: { page, limit },
+  });
+  return data;
+}

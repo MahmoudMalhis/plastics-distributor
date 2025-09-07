@@ -6,11 +6,10 @@ import { strictRateLimiter } from "../../middlewares/rate-limit.js";
 const router = Router();
 
 router.post(
-  "/",
+  "/customers/:id/payments",
   requireAuth,
   ensureActive,
   strictRateLimiter,
-  ctrl.createPayment
+  ctrl.createForCustomer
 );
-
 export default router;

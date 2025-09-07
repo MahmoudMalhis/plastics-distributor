@@ -306,7 +306,7 @@ export default function DistributorCatalog() {
                 notes: form.notes,
               });
               setCustomer(created); // اختَر العميل الجديد في السلة
-              notify("success", "تم إنشاء العميل وربطه بك كموزّع");
+              notify("success", " وربطه بك كموزّع");
               setOpenCreate(false);
             } catch (err) {
               setFormError(err?.response?.data?.error || "فشل حفظ العميل");

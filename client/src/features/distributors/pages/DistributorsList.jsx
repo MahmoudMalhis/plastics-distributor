@@ -102,7 +102,6 @@ export default function DistributorsList() {
   const onSendPasswordLink = async (distributor) => {
     try {
       const { waText, setUrl } = await issuePasswordToken(distributor.id);
-      console.log(waText);
       const text =
         waText ||
         `مرحبا ${

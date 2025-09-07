@@ -1,6 +1,18 @@
 import * as repo from "./customers.repo.js";
-import { generateCustomerSku } from "./sku.util.js";
 import * as distributorsRepo from "../distributors/distributors.repo.js";
+import db from "../../db/knex.js";
+import { generateCustomerSku } from "../../utils/sku.js";
+
+function canSeeCustomer(user, customer) {
+  if (!user) return false;
+  if (user.role === "admin") return true;
+  if (
+    user.role === "distributor" &&
+    customer?.distributor_id === user.distributor_id
+  )
+    return true;
+  return false;
+}
 
 function isAdmin(user) {
   return user && user.role === "admin";
@@ -66,7 +78,7 @@ export async function create(dto = {}, currentUser) {
 
   let customer_sku = String(dto.customer_sku || "").trim();
   if (!customer_sku) {
-    customer_sku = await generateCustomerSku();
+    customer_sku = await generateCustomerSku(db);
   }
 
   let distributor_id = null;
@@ -179,28 +191,95 @@ export async function update(id, dto = {}, currentUser) {
 }
 
 // تفاصيل عميل
-export function getDetails(id) {
-  if (!id) throw Object.assign(new Error("id مطلوب"), { status: 400 });
-  return repo.getDetails(id);
+export async function getDetails(id, user) {
+  const customer = await repo.getDetailsWithDistributor(id); // NEW
+  if (!customer) return null;
+  if (!canSeeCustomer(user, customer)) {
+    const e = new Error("forbidden");
+    e.status = 403;
+    throw e;
+  }
+  const distributor = customer.distributor_id
+    ? { id: customer.distributor_id, name: customer.distributor_name || null }
+    : null;
+
+  const { distributor_name, ...rest } = customer;
+  return { ...rest, distributor };
 }
 
 export async function getStatement({ customerId, from, to, limit = 200 }) {
-  return ledgerRepo.getCustomerStatement({ customerId, from, to, limit });
+  // جِب العميل وتحقق صلاحية العرض (اختياري لو المسار مقيّد مسبقًا)
+  const base = await repo.getCustomerBasic(customerId);
+  if (!base) {
+    const e = new Error("not found");
+    e.status = 404;
+    throw e;
+  }
+  // لو حابب تمنع الموزّع يشوف غير عملائه، مرّر user هنا ونادي canSeeCustomer
+
+  const q = db("ledger_entries").where({ customer_id: customerId });
+  if (from) q.andWhere("created_at", ">=", from);
+  if (to) q.andWhere("created_at", "<=", to);
+  const items = await q.orderBy("created_at", "asc").limit(limit);
+
+  const totals = items.reduce(
+    (acc, r) => {
+      acc.debit += Number(r.debit || 0);
+      acc.credit += Number(r.credit || 0);
+      return acc;
+    },
+    { debit: 0, credit: 0 }
+  );
+  return {
+    items,
+    total_debit: totals.debit,
+    total_credit: totals.credit,
+    balance: totals.debit - totals.credit,
+  };
 }
 
-export async function timeline(
-  customerId,
-  { page = 1, limit = 50 } = {},
-  user
-) {
-  // صلاحيات: الموزّع لا يرى إلا زبائنه
-  const details = await repo.getDetails(customerId);
-  if (!details) throw Object.assign(new Error("not found"), { status: 404 });
-  if (
-    user?.role === "distributor" &&
-    details.distributor_id !== user.distributor_id
-  ) {
-    throw Object.assign(new Error("forbidden"), { status: 403 });
+export async function getTimeline(customerId, { page = 1, limit = 20 }, user) {
+  const base = await repo.getCustomerBasic(customerId);
+  if (!base) {
+    const e = new Error("not found");
+    e.status = 404;
+    throw e;
   }
-  return repo.getTimeline(customerId, { page, limit });
+  if (!canSeeCustomer(user, base)) {
+    const e = new Error("forbidden");
+    e.status = 403;
+    throw e;
+  }
+
+  const rows = await repo.getTimeline({ customerId, page, limit });
+  const items = rows.slice(0, limit).map((r) => {
+    if (r.kind === "order") {
+      return {
+        ts: r.ts,
+        type: "order",
+        orderId: r.id,
+        code: r.ref,
+        total: Number(r.total ?? 0),
+        status: r.status,
+        title: `فاتورة #${r.ref}`,
+      };
+    }
+    return {
+      ts: r.ts,
+      type: "payment",
+      paymentId: r.id,
+      amount: Number(r.amount ?? 0),
+      method: r.method || null,
+      reference: r.ref || null,
+      note: r.note || null,
+      title: `دفعة ${r.amount ?? ""}`,
+    };
+  });
+
+  return {
+    items,
+    page,
+    limit,
+    hasMore: rows.length > limit,
+  };
 }

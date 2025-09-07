@@ -1,91 +1,78 @@
 import db from "../../db/knex.js";
-import * as repo from "./payments.repo.js";
-import * as custRepo from "../customers/customers.repo.js";
-import * as ordersRepo from "../orders/orders.repo.js"; // لديك وحدة الطلبات
-import { io } from "../../server.js";
+import * as paymentsRepo from "./payments.repo.js";
+import * as customersRepo from "../customers/customers.repo.js";
+
+function canReceiveForCustomer(user, customer) {
+  if (!user) return false;
+  if (user.role === "admin") return true;
+  if (
+    user.role === "distributor" &&
+    customer?.distributor_id === (user?.distributor_id ?? user?.distributorId)
+  )
+    return true;
+  return false;
+}
 
 export async function createPayment({
   customer_id,
   order_id,
   amount,
-  method, // 'cash' | 'transfer' | 'check'
+  method,
+  reference,
   note,
   received_at,
   byUserId,
   byUserRole,
   byDistributorId,
 }) {
-  if (!customer_id || !amount || amount <= 0) {
-    const err = new Error("customer_id و amount مطلوبان، وamount > 0");
-    err.status = 400;
-    throw err;
-  }
-  // تحقق وجود العميل
-  const customer = await custRepo.getById(customer_id);
+  const user = {
+    id: byUserId,
+    role: byUserRole,
+    distributor_id: byDistributorId,
+  };
+  return createForCustomer(
+    customer_id,
+    { amount, method, reference, note, received_at, order_id },
+    user
+  );
+}
+
+export async function createForCustomer(customerId, payload, user) {
+  const customer = await customersRepo.getCustomerBasic(customerId);
   if (!customer) {
-    const err = new Error("العميل غير موجود");
-    err.status = 404;
-    throw err;
+    const e = new Error("customer not found");
+    e.status = 404;
+    throw e;
+  }
+  if (!canReceiveForCustomer(user, customer)) {
+    const e = new Error("forbidden");
+    e.status = 403;
+    throw e;
   }
 
-  // إن أُرسِل order_id تأكّد أنه لنفس العميل
-  if (order_id) {
-    const order = await ordersRepo.getById(order_id);
-    if (!order || order.customer_id !== customer_id) {
-      const err = new Error("الطلب غير موجود أو لا يخص العميل");
-      err.status = 400;
-      throw err;
-    }
+  const amount = Number(payload?.amount || 0);
+  if (!(amount > 0)) {
+    const e = new Error("amount must be > 0");
+    e.status = 400;
+    throw e;
   }
 
-  if (byUserRole === "distributor") {
-    if (!byDistributorId || customer.distributor_id !== byDistributorId) {
-      const err = new Error("forbidden: customer not owned by distributor");
-      err.status = 403;
-      throw err;
-    }
-    if (order && order.distributor_id !== byDistributorId) {
-      const err = new Error("forbidden: order not owned by distributor");
-      err.status = 403;
-      throw err;
-    }
-  }
+  const dto = {
+    customer_id: customerId,
+    amount,
+    method: payload?.method || null,
+    reference: payload?.reference || null,
+    note: payload?.note || null,
+    received_at: payload?.received_at || null,
+    created_by_user_id: user?.id || null,
+    distributor_id: user?.role === "distributor" ? (user.distributor_id ?? user.distributorId ?? null) : null,
+  };
 
-  return await db.transaction(async (trx) => {
-    // 1) سجّل الدفعة
-    const payment = await repo.insertPayment(trx, {
-      customer_id,
-      order_id,
-      amount,
-      method,
-      note,
-      received_at,
-      created_by: byUserId,
-    });
-
-    // 2) قيد Ledger (الدائن)
-    const entry = await repo.postLedgerCredit(trx, {
-      customer_id,
-      ref_type: "payment",
-      ref_id: payment.id,
-      amount,
-    });
-
-    // 3) (اختياري) تحديث حالة خطة القسط لو مرتبطة بطلب محدد
-    if (order_id) {
-      await repo.tryCompleteInstallmentPlanIfSettled(trx, { order_id });
-    }
-
-    // 4) بث Socket/WebPush (في الحد الأدنى Socket)
-    io.emit("payment:created", {
-      customer_id,
-      payment_id: payment.id,
-      amount,
-      method,
-      balance_after: entry.balance_after,
-      at: entry.created_at,
-    });
-
-    return { payment, ledger: entry };
+  const payment = await db.transaction(async (trx) => {
+    const p = await paymentsRepo.insertPayment(dto, trx);
+    await paymentsRepo.insertLedgerForPayment(p, trx);
+    return p;
   });
+
+  return { payment };
 }

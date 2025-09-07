@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { getCustomer } from "../api/customers.api";
 import PageHeader from "../../../components/ui/PageHeader";
+import Modal from "../../../components/ui/Modal";
 import StatusCell from "../../orders/components/StatusCell";
+import CustomerTimeline from "../components/CustomerTimeline";
+import { notify } from "../../../utils/alerts";
+import { createPaymentForCustomer } from "../../payments/api/payments.api";
 
 export default function CustomerProfile() {
   const { id } = useParams();
@@ -11,6 +15,16 @@ export default function CustomerProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const [timelineKey, setTimelineKey] = useState(0);
+  const [payOpen, setPayOpen] = useState(false);
+  const [savingPay, setSavingPay] = useState(false);
+  const [payForm, setPayForm] = useState({
+    amount: "",
+    method: "cash",
+    reference: "",
+    note: "",
+    received_at: "",
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -55,16 +69,78 @@ export default function CustomerProfile() {
   }
 
   const orders = customer.orders || [];
+  const balance = Number(customer.balance || 0);
 
   const totalAmount = orders.reduce(
     (sum, order) => sum + Number(order.total),
     0
   );
 
+  function formatCurrency(n) {
+    const v = Number(n || 0);
+    // غيّر العملة حسب الإعدادات لديك
+    return `${v.toLocaleString()} ₪`;
+  }
+
+  async function submitPayment(e) {
+    e.preventDefault();
+    const amt = Number(payForm.amount);
+    if (!(amt > 0)) {
+      notify("error", "أدخل مبلغاً صحيحاً");
+      return;
+    }
+    try {
+      setSavingPay(true);
+      await createPaymentForCustomer(Number(id), {
+        amount: amt,
+        method: payForm.method || "cash",
+        reference: payForm.reference || null,
+        note: payForm.note || null,
+        received_at: payForm.received_at || null,
+      });
+      notify("success", "تم تسجيل الدفعة");
+
+      // حدث بيانات العميل (الرصيد) وأعد تحميل التايملاين
+      const fresh = await getCustomer(id);
+      setCustomer(fresh);
+      setTimelineKey((k) => k + 1);
+
+      // صفّر النموذج وأغلق المودال
+      setPayForm({
+        amount: "",
+        method: "cash",
+        reference: "",
+        note: "",
+        received_at: "",
+      });
+      setPayOpen(false);
+    } catch (e) {
+      notify("error", e?.response?.data?.error || "فشل تسجيل الدفعة");
+    } finally {
+      setSavingPay(false);
+    }
+  }
+
+  function goToOrdersPage() {
+    // حدّد مسار قائمة الطلبات حسب الدور المخزّن
+    const stored = localStorage.getItem("userRole") || "";
+    const role = stored.toLowerCase();
+    const base = role === "admin" ? "/admin/orders" : "/distributor/orders";
+    // إن كانت لديك صفحة قائمة تدعم التصفية بـ customerId، مرّر بارام
+    navigate(`${base}?customerId=${id}`);
+  }
+
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto py-5">
         <PageHeader title={`ملف : ${customer.name}`}>
+          <button
+            onClick={goToOrdersPage}
+            className="inline-flex items-center gap-2 px-4 h-11 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 cursor-pointer"
+          >
+            <span className="material-icons">receipt_long</span>
+            عرض الطلبات
+          </button>
           <button
             className="relative inline-flex items-center justify-center bg-blue-600 text-white font-bold py-2.5 px-4 sm:px-5 rounded-lg shadow-md hover:bg-blue-700 transition cursor-pointer"
             onClick={() => navigate("/customers")}
@@ -84,6 +160,14 @@ export default function CustomerProfile() {
                 <Info label="الكود" value={customer.customer_sku} />
                 <Info label="الهاتف" value={customer.phone || "—"} />
                 <Info label="العنوان" value={customer.address || "—"} />
+                <Info
+                  label="الموزّع"
+                  value={
+                    customer?.distributor?.name ||
+                    customer?.distributor_name ||
+                    "—"
+                  }
+                />
                 <Info label="الملاحظات" value={customer.notes || "—"} />
                 <Info
                   label="الحالة"
@@ -95,10 +179,7 @@ export default function CustomerProfile() {
                         : "text-red-600 bg-red-100"
                     }`}
                 />
-                <Info
-                  label="الرصيد الحالي"
-                  value={`${Number(customer.balance || 0).toLocaleString()} ₪`}
-                />
+                <Info label="الرصيد الحالي" value={formatCurrency(balance)} />
                 <Info
                   label="عدد الطلبات"
                   value={
@@ -141,7 +222,10 @@ export default function CustomerProfile() {
                   {totalAmount} ₪
                 </div>
                 <p className="text-gray-500 mt-2">الرصيد الحالي</p>
-                <button className="mt-6 bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg shadow-md hover:bg-blue-700 transition-colors flex items-center gap-2 cursor-pointer">
+                <button
+                  className="mt-6 bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg shadow-md hover:bg-blue-700 transition-colors flex items-center gap-2 cursor-pointer"
+                  onClick={() => setPayOpen(true)}
+                >
                   <span className="material-icons">add</span>
                   إضافة دفعة
                 </button>
@@ -151,7 +235,7 @@ export default function CustomerProfile() {
         </div>
 
         {/* قائمة الطلبات */}
-        <div className="mt-8 bg-white rounded-xl shadow-lg p-6">
+        {/* <div className="mt-8 bg-white rounded-xl shadow-lg p-6">
           <h3 className="text-xl font-bold mb-3">طلباته</h3>
           {orders.length === 0 ? (
             <div className="text-[#49739c]">لا توجد طلبات</div>
@@ -208,8 +292,109 @@ export default function CustomerProfile() {
               </table>
             </div>
           )}
+        </div> */}
+        <div className="mt-8">
+          <CustomerTimeline customerId={Number(id)} key={timelineKey} />
         </div>
       </div>
+      <Modal
+        open={payOpen}
+        onClose={() => setPayOpen(false)}
+        title="إضافة دفعة"
+        footer={
+          <button
+            type="submit"
+            form="payment-form"
+            disabled={savingPay}
+            className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition cursor-pointer disabled:opacity-60"
+          >
+            {savingPay ? "جارٍ الحفظ..." : "حفظ الدفعة"}
+          </button>
+        }
+      >
+        <form
+          id="payment-form"
+          onSubmit={submitPayment}
+          className="space-y-4"
+          dir="rtl"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="flex flex-col">
+              <span className="text-sm text-[#49739c] mb-1">المبلغ</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                value={payForm.amount}
+                onChange={(e) =>
+                  setPayForm((f) => ({ ...f, amount: e.target.value }))
+                }
+                className="h-11 rounded-lg border border-[#cedbe8] bg-slate-50 px-3 focus:outline-none"
+                placeholder="0.00"
+              />
+            </label>
+
+            <label className="flex flex-col">
+              <span className="text-sm text-[#49739c] mb-1">الطريقة</span>
+              <select
+                value={payForm.method}
+                onChange={(e) =>
+                  setPayForm((f) => ({ ...f, method: e.target.value }))
+                }
+                className="h-11 rounded-lg border border-[#cedbe8] bg-slate-50 px-3 focus:outline-none"
+              >
+                <option value="cash">نقدًا</option>
+                <option value="transfer">تحويل بنكي</option>
+                <option value="check">شيك</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col">
+              <span className="text-sm text-[#49739c] mb-1">
+                مرجع/رقم إيصال (اختياري)
+              </span>
+              <input
+                value={payForm.reference}
+                onChange={(e) =>
+                  setPayForm((f) => ({ ...f, reference: e.target.value }))
+                }
+                className="h-11 rounded-lg border border-[#cedbe8] bg-slate-50 px-3 focus:outline-none"
+                placeholder="رقم إيصال/مرجع"
+              />
+            </label>
+
+            <label className="flex flex-col">
+              <span className="text-sm text-[#49739c] mb-1">
+                التاريخ والوقت (اختياري)
+              </span>
+              <input
+                type="datetime-local"
+                value={payForm.received_at}
+                onChange={(e) =>
+                  setPayForm((f) => ({ ...f, received_at: e.target.value }))
+                }
+                className="h-11 rounded-lg border border-[#cedbe8] bg-slate-50 px-3 focus:outline-none"
+              />
+            </label>
+
+            <label className="flex flex-col sm:col-span-2">
+              <span className="text-sm text-[#49739c] mb-1">
+                ملاحظة (اختياري)
+              </span>
+              <textarea
+                rows={3}
+                value={payForm.note}
+                onChange={(e) =>
+                  setPayForm((f) => ({ ...f, note: e.target.value }))
+                }
+                className="rounded-lg border border-[#cedbe8] bg-slate-50 px-3 py-2 focus:outline-none"
+                placeholder="ملاحظات حول الدفعة"
+              />
+            </label>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
