@@ -7,14 +7,7 @@ import StatusCell from "../../orders/components/StatusCell";
 import CustomerTimeline from "../components/CustomerTimeline";
 import { notify } from "../../../utils/alerts";
 import { createPaymentForCustomer } from "../../payments/api/payments.api";
-
-function nowForDatetimeLocal() {
-  const d = new Date();
-  // نضبط الإزاحة لأن datetime-local لا يدعم المناطق الزمنية
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  // صيغة YYYY-MM-DDTHH:mm
-  return d.toISOString().slice(0, 16);
-}
+import { currency, nowForDatetimeLocal } from "../../../utils/format";
 
 export default function CustomerProfile() {
   const { id } = useParams();
@@ -92,12 +85,6 @@ export default function CustomerProfile() {
     (sum, order) => sum + Number(order.total),
     0
   );
-
-  function formatCurrency(n) {
-    const v = Number(n || 0);
-    // غيّر العملة حسب الإعدادات لديك
-    return `${v.toLocaleString()} ₪`;
-  }
 
   async function submitPayment(e) {
     e.preventDefault();
@@ -192,7 +179,7 @@ export default function CustomerProfile() {
                         : "text-red-600 bg-red-100"
                     }`}
                 />
-                <Info label="الرصيد الحالي" value={formatCurrency(balance)} />
+                <Info label="الرصيد الحالي" value={currency(balance)} />
                 <Info
                   label="عدد الطلبات"
                   value={
@@ -232,7 +219,7 @@ export default function CustomerProfile() {
               </h2>
               <div className="flex flex-col items-center justify-center h-full -mt-10">
                 <div className="text-4xl font-bold text-gray-800">
-                  {totalAmount} ₪
+                  {currency(totalAmount)}
                 </div>
                 <p className="text-gray-500 mt-2">الرصيد الحالي</p>
                 <button

@@ -155,22 +155,40 @@ export async function listRevisions(orderId) {
 }
 
 // ====== Installment plan (اختياري: إنشاء خطة عند الدفع بالتقسيط) ======
-export async function createInstallmentPlan({ amount, period }) {
-  // عدّل أسماء الأعمدة حسب جدولك إن اختلفت
-  const [row] = await db("installment_plans")
-    .insert({
-      amount: Number(amount),
-      period: String(period),
-      created_at: db.fn.now(),
-    })
-    .returning("*");
-  return (
-    row ||
-    db("installment_plans")
-      .where({ amount: Number(amount), period: String(period) })
-      .orderBy("id", "desc")
-      .first()
-  );
+export async function createInstallmentPlan(data = {}) {
+  const base = {
+    amount: Number(data.amount),
+    period: String(data.period),
+    created_at: db.fn.now(),
+  };
+  // حقول اختيارية — تُحفظ فقط إن وُجدت الأعمدة
+  const extended = {
+    ...base,
+    order_id: data.order_id ?? null,
+    customer_id: data.customer_id ?? null,
+    status: data.status ?? "active",
+    next_due_date: data.next_due_date ?? null,
+    remaining_amount:
+      data.remaining_amount != null ? Number(data.remaining_amount) : null,
+    paid_installments:
+      data.paid_installments != null ? Number(data.paid_installments) : null,
+    frequency: data.frequency ?? data.period ?? null,
+  };
+  try {
+    const [row] = await db("installment_plans").insert(extended).returning("*");
+    if (row) return row;
+  } catch (e) {
+    if (String(e?.code) !== "ER_BAD_FIELD_ERROR") throw e;
+    // fallback لأعمدة قليلة
+    const [row] = await db("installment_plans").insert(base).returning("*");
+    if (row) return row;
+  }
+  // SQLite/MySQL قد لا يعيد returning(*)
+  const created = await db("installment_plans")
+    .where({ amount: Number(base.amount), period: String(base.period) })
+    .orderBy("id", "desc")
+    .first();
+  return created;
 }
 
 // ====== تجميع كامل للطلب ======

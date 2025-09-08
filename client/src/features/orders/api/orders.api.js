@@ -118,3 +118,18 @@ export async function deleteOrder(id) {
   const { data } = await api.delete(`/api/orders/${id}`);
   return data;
 }
+
+export async function listOrdersByCustomer(
+  customerId,
+  { page = 1, limit = 20, status } = {}
+) {
+  const cid = Number(customerId);
+  if (!Number.isFinite(cid) || cid <= 0) throw new Error("Invalid customerId");
+
+  const params = { page, limit };
+  if (status) params.status = status;
+
+  const { data } = await api.get(`/api/orders/customer/${cid}`, { params });
+  // السيرفر يرجّع { customer, orders, pagination }
+  return data;
+}

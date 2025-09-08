@@ -3,15 +3,7 @@ import { useEffect, useState } from "react";
 import { getCustomerTimeline } from "../api/customers.api";
 import { useNavigate } from "react-router-dom";
 import StatusBadge from "../../orders/components/StatusBadge";
-
-function formatCurrency(n) {
-  const v = Number(n || 0);
-  return v.toLocaleString("en-IL", { style: "currency", currency: "ILS" });
-}
-function fmtDate(d) {
-  const dt = new Date(d);
-  return dt.toLocaleString("en-IL");
-}
+import { currency, fmtDateTime } from "../../../utils/format";
 
 export default function CustomerTimeline({ customerId }) {
   const [items, setItems] = useState([]);
@@ -61,9 +53,9 @@ export default function CustomerTimeline({ customerId }) {
           >
             <div className="flex justify-between items-center gap-3">
               <div className="flex items-start gap-3">
-                <div className="mt-1 rounded-full flex justify-center items-center w-10 h-10 bg-indigo-100">
+                <div className="mt-1 rounded-full flex justify-center items-center w-10 h-10 bg-blue-100">
                   {it.type === "order" ? (
-                    <span className="material-icons text-[22px] text-indigo-600">
+                    <span className="material-icons text-[22px] text-blue-600">
                       receipt_long
                     </span>
                   ) : (
@@ -79,20 +71,24 @@ export default function CustomerTimeline({ customerId }) {
 
                   {it.type === "order" ? (
                     <div className="text-sm text-[#0d141c] mt-1">
-                      الحالة:
-                      <span className="font-semibold">
-                        {<StatusBadge value={it.status} />}
-                      </span>
-                      — الإجمالي:
-                      <span className="font-semibold">
-                        {formatCurrency(it.total)}
-                      </span>
+                      <div>
+                        الحالة:
+                        <span className="font-semibold mr-1">
+                          {<StatusBadge value={it.status} />}
+                        </span>
+                      </div>
+                      <div>
+                        قيمة الفاتورة:
+                        <span className="font-semibold mr-1">
+                          {currency(it.total)}
+                        </span>
+                      </div>
                     </div>
                   ) : (
                     <div className="text-sm text-[#0d141c] mt-1">
                       المبلغ:
                       <span className="font-semibold">
-                        {formatCurrency(it.amount)}
+                        {currency(it.amount)}
                       </span>
                       {it.method ? (
                         <>
@@ -116,15 +112,15 @@ export default function CustomerTimeline({ customerId }) {
                     <div className="mt-2">
                       <button
                         onClick={() => navigate(`/orders/${it.orderId}`)}
-                        className="px-3 h-9 rounded-lg hover:bg-indigo-50 cursor-pointer text-sm text-indigo-600"
+                        className="px-3 h-9 rounded-lg hover:bg-blue-50 cursor-pointer text-sm text-blue-600"
                       >
-                        فتح الفاتورة
+                        عرض التفاصبل
                       </button>
                     </div>
                   )}
                 </div>
               </div>
-              <div className="text-xs text-[#49739c]">{fmtDate(it.ts)}</div>
+              <div className="text-xs text-[#49739c]">{fmtDateTime(it.ts)}</div>
             </div>
           </li>
         ))}
@@ -141,7 +137,7 @@ export default function CustomerTimeline({ customerId }) {
           </button>
         ) : (
           items.length > 0 && (
-            <div className="text-center text-indigo-600 text-sm">
+            <div className="text-center text-blue-600 text-sm">
               لا مزيد من العناصر
             </div>
           )

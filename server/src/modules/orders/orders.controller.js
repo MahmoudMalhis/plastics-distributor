@@ -65,3 +65,13 @@ export async function update(req, res, next) {
     next(e);
   }
 }
+
+export async function listByCustomer(req, res, next) {
+  try {
+    const customerId = Number(req.params.customerId);
+    const out = await svc.getCustomerOrders(customerId, req.query, req.user);
+    res.json(out);
+  } catch (e) {
+    next(e);
+  }
+}

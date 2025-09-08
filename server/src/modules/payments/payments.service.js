@@ -58,7 +58,7 @@ export async function createForCustomer(customerId, payload, user) {
     throw e;
   }
 
-  const dto = {
+  const payment = await paymentsRepo.insertPayment({
     customer_id: customerId,
     order_id: payload?.order_id || null,
     amount,
@@ -68,56 +68,57 @@ export async function createForCustomer(customerId, payload, user) {
     received_at: payload?.received_at
       ? new Date(payload.received_at)
       : new Date(),
-    created_by: user?.id || null,
-  };
+    created_by_user_id: user?.id || null,
+    distributor_id:
+      user?.role === "distributor"
+        ? user?.distributor_id ?? user?.distributorId ?? null
+        : null,
+  });
 
-  const payment = await db.transaction(async (trx) => {
-    // إنشاء الدفعة
-    const [paymentId] = await trx("payments").insert(dto);
-    const p = await trx("payments").where({ id: paymentId }).first();
-
-    // تسجيل في دفتر الحسابات
-    await paymentsRepo.postLedgerCredit(trx, {
+  // 2) قيد دائن في الدفتر
+  try {
+    await paymentsRepo.postLedgerCredit(db, {
       customer_id: customerId,
       ref_type: "payment",
-      ref_id: paymentId,
+      ref_id: payment.id,
       amount,
     });
+  } catch (error) {
+    console.log(error);
+  }
 
-    // إذا كانت الدفعة مرتبطة بطلب له خطة تقسيط، حدث الخطة
-    if (payload?.order_id) {
-      const plan = await trx("installment_plans")
+  // 3) تحديث خطة التقسيط (إن وُجدت) — تجاهُل آمن لو الأعمدة غير موجودة
+  if (payload?.order_id) {
+    try {
+      const plan = await db("installment_plans")
         .where({ order_id: payload.order_id })
         .first();
-
       if (plan) {
-        // حدث المبلغ المتبقي وعدد الأقساط المدفوعة
-        const newRemaining = Math.max(
-          0,
-          Number(plan.remaining_amount) - amount
-        );
-        const paidInstallments = Number(plan.paid_installments) + 1;
-
-        const updates = {
-          remaining_amount: newRemaining,
-          paid_installments: paidInstallments,
-        };
-
-        // إذا تم سداد كامل المبلغ، أكمل الخطة
-        if (newRemaining <= 0) {
-          updates.status = "completed";
-          updates.next_due_date = null;
-        } else {
-          // حدث تاريخ الاستحقاق التالي
-          updates.next_due_date = calculateNextDueDate(plan.frequency);
+        const freq = plan.frequency || plan.period || "monthly";
+        const next = calculateNextDueDate(freq);
+        const updates = {};
+        if ("remaining_amount" in plan)
+          updates.remaining_amount = Math.max(
+            0,
+            Number(plan.remaining_amount || 0) - amount
+          );
+        if ("paid_installments" in plan)
+          updates.paid_installments = Number(plan.paid_installments || 0) + 1;
+        if ("next_due_date" in plan) updates.next_due_date = next;
+        if ("status" in plan && "remaining_amount" in updates) {
+          if (updates.remaining_amount <= 0) {
+            updates.status = "completed";
+            if ("next_due_date" in plan) updates.next_due_date = null;
+          }
         }
-
-        await trx("installment_plans").where({ id: plan.id }).update(updates);
+        if (Object.keys(updates).length > 0) {
+          await db("installment_plans").where({ id: plan.id }).update(updates);
+        }
       }
+    } catch (error) {
+      console.log(error);
     }
-
-    return p;
-  });
+  }
 
   return { payment };
 }

@@ -10,6 +10,7 @@ import {
 } from "../api/customers.api";
 import CustomerForm from "../components/CustomerForm";
 import { Link, useNavigate } from "react-router-dom";
+import { currency } from "../../../utils/format";
 
 export default function CustomersList() {
   const [search, setSearch] = useState("");
@@ -262,9 +263,7 @@ export default function CustomersList() {
                 </td>
                 <td className="p-3">{cust.customer_sku}</td>
                 <td className="p-3">{cust.phone || "—"}</td>
-                <td className="p-3">
-                  {Number(cust.balance || 0).toLocaleString()} ₪
-                </td>
+                <td className="p-3">{currency(cust.balance)}</td>
                 <td className="p-3">
                   {cust.ordersCount != null
                     ? cust.ordersCount
@@ -279,7 +278,7 @@ export default function CustomersList() {
                 </td>
                 <td className="p-3 text-center flex justify-center gap-3">
                   <button
-                    onClick={() => navigate(`/orders/${cust.id}`)}
+                    onClick={() => navigate(`/orders/customer/${cust.id}`)}
                     className="inline-flex items-center justify-center transition shadow-sm cursor-pointer
                                 rounded-full bg-indigo-100 text-indigo-600 hover:bg-indigo-200
                                 w-9 h-9 text-[20px]"

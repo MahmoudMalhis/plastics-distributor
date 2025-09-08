@@ -27,10 +27,7 @@ router.post(
       const { amount, method, reference, note, received_at } = req.body || {};
 
       // جلب معلومات الطلب
-      const order = await req.app.locals
-        .db("orders")
-        .where({ id: orderId })
-        .first();
+      const order = await db("orders").where({ id: orderId }).first();
 
       if (!order) {
         return res.status(404).json({ error: "الطلب غير موجود" });
@@ -41,16 +38,9 @@ router.post(
       }
 
       // إنشاء الدفعة
-      const out = await ctrl.createForCustomer(
+      const out = await svc.createForCustomer(
         order.customer_id,
-        {
-          amount,
-          method,
-          reference,
-          note,
-          received_at,
-          order_id: orderId,
-        },
+        { amount, method, reference, note, received_at, order_id: orderId },
         req.user
       );
 

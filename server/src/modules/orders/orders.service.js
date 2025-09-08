@@ -1,4 +1,6 @@
 import * as repo from "./orders.repo.js";
+import db from "../../db/knex.js";
+import * as paymentsRepo from "../payments/payments.repo.js";
 
 // ----- أدوات -----
 function assertItemsValid(items = []) {
@@ -86,7 +88,6 @@ function normalizePayment(dto = {}) {
   return res;
 }
 
-// ----- إنشاء -----
 export async function create(payload, currentUser) {
   const status = String(payload.status || "draft").toLowerCase();
   if (!["draft", "submitted"].includes(status)) {
@@ -118,22 +119,6 @@ export async function create(payload, currentUser) {
 
   const pay = normalizePayment(payload);
 
-  if (
-    pay.payment_method === "installments" &&
-    pay._installment_amount &&
-    pay._installment_period
-  ) {
-    try {
-      const plan = await repo.createInstallmentPlan({
-        amount: pay._installment_amount,
-        period: pay._installment_period,
-      });
-      pay.installment_plan_id = plan?.id ?? null;
-    } catch {
-      pay.installment_plan_id = null;
-    }
-  }
-
   const baseOrder = {
     distributor_id: distributor_id,
     created_by,
@@ -142,7 +127,7 @@ export async function create(payload, currentUser) {
     total: Number(total.toFixed(2)),
     notes: payload.notes || null,
     payment_method: pay.payment_method,
-    installment_plan_id: pay.installment_plan_id ?? null,
+    installment_plan_id: null,
     check_note: pay.check_note ?? null,
     submitted_at: status === "submitted" ? dbNow() : null,
     approved_at: null,
@@ -156,7 +141,72 @@ export async function create(payload, currentUser) {
     await repo.insertItems(items.map((it) => ({ ...it, order_id: order.id })));
   }
 
-  return repo.getOrderFull(order.id);
+  try {
+    await paymentsRepo.postLedgerDebit(db, {
+      customer_id,
+      ref_type: "order",
+      ref_id: order.id,
+      amount: total,
+    });
+  } catch (error) {
+    console.log(error);
+  }
+
+  if (
+    pay.payment_method === "installments" &&
+    pay._installment_amount &&
+    pay._installment_period
+  ) {
+    try {
+      const plan = await repo.createInstallmentPlan({
+        order_id: order.id,
+        customer_id,
+        amount: pay._installment_amount,
+        period: pay._installment_period,
+        status: "active",
+        next_due_date: calcNextDue(pay._installment_period),
+        remaining_amount: total,
+        paid_installments: 0,
+        frequency: pay._installment_period,
+      });
+      if (plan?.id) {
+        await repo.updateOrder(order.id, { installment_plan_id: plan.id });
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  const fp = Number(payload.first_payment || 0);
+  if (fp > 0) {
+    try {
+      const payment = await paymentsRepo.insertPayment({
+        customer_id,
+        order_id: order.id,
+        amount: fp,
+        method: pay.payment_method === "cheque" ? "check" : "cash",
+        reference: null,
+        note:
+          pay.payment_method === "installments"
+            ? "دفعة أولى (تقسيط)"
+            : pay.payment_method === "cheque"
+            ? "دفعة أولى (شيك)"
+            : "دفعة أولى",
+        received_at: new Date(),
+        created_by_user_id: currentUser?.id || null,
+        distributor_id,
+      });
+      await paymentsRepo.postLedgerCredit(db, {
+        customer_id,
+        ref_type: "payment",
+        ref_id: payment.id,
+        amount: fp,
+      });
+    } catch (error) {
+      console.log(error);
+    }
+    return repo.getOrderFull(order.id);
+  }
 }
 
 export async function list(query = {}, currentUser) {
@@ -171,6 +221,13 @@ export async function list(query = {}, currentUser) {
     opts.distributor_id = Number(currentUser.distributor_id);
   }
   return repo.listOrders(opts);
+}
+
+function calcNextDue(period) {
+  const d = new Date();
+  if (period === "weekly") d.setDate(d.getDate() + 7);
+  else d.setMonth(d.getMonth() + 1);
+  return d;
 }
 
 export async function remove(id, currentUser) {
@@ -365,7 +422,7 @@ export async function getCustomerOrders(customerId, query = {}, currentUser) {
   };
 
   // استخدم الدالة البسيطة (أكثر توافقاً)
-  const result = await repo.listOrdersByCustomerSimple(customerId, opts);
+  const result = await repo.listOrdersByCustomer(customerId, opts);
 
   // إضافة معلومات إضافية للطلبات
   const enhancedRows = await Promise.all(
