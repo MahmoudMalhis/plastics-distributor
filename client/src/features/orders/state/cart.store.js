@@ -65,6 +65,7 @@ export function addItem(product, qty = 1) {
       price: Number(p.price ?? 0),
       image: p.image_url || p.image || null,
       sku: p.sku || null,
+      unit: p.unit || null,
       qty: qty,
     });
     notify("success", "تمت اضافة المنتج الى السلة");

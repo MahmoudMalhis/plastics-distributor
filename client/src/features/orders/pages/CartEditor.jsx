@@ -96,19 +96,20 @@ export default function CartEditor() {
     try {
       setSubmitting(true);
 
-      // احصل على distributor_id من المستخدم الحالي أو من مكان آخر
-      // مثلاً من localStorage أو من context
-      const distributorId =
-        localStorage.getItem("distributor_id") ||
-        sessionStorage.getItem("distributor_id") ||
-        1; // قيمة افتراضية مؤقتة
+      const enhancedItems = items.map((item) => ({
+        ...item,
+        productId: item.productId,
+        qty: item.qty,
+        sku: item.sku,
+        price: item.price,
+        unit: item.unit,
+      }));
 
       const res = await createOrder({
-        items, // [{ productId, qty }]
+        items: enhancedItems, // استخدام العناصر المحسنة
         notes,
         customer_id: customer?.id,
         status: "submitted",
-        distributor_id: Number(distributorId), // أضف هذا السطر
         payment_method: paymentMethod,
         installment_amount:
           paymentMethod === "installments"

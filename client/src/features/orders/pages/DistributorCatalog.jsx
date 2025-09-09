@@ -346,7 +346,7 @@ function ProductCard({ product, onAdd }) {
     if (inCart) {
       removeItem(product.id); // ✅ يشيل المنتج
     } else {
-      onAdd(qty); // ➕ يضيف المنتج
+      onAdd(qty, product); // ➕ يضيف المنتج
     }
   };
 

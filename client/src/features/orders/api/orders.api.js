@@ -22,6 +22,8 @@ export async function createOrder({
     items: (items || []).map((it) => ({
       product_id: it.productId,
       qty: it.qty,
+      sku: it.sku,
+      unit_price: it.price,
     })),
     notes,
   };
@@ -57,21 +59,30 @@ export async function getOrder(orderId) {
   // السيرفر يرجّع { order, items, revisions, customer }
   if (!data?.order) return data;
   const o = data.order;
-  const items = (data.items || []).map((it) => {
-    // product_snapshot فيه name/sku/price المحتسبة وقت الطلب
-    let snap = {};
-    try {
-      snap = it.product_snapshot ? JSON.parse(it.product_snapshot) : {};
-    } catch (error) {
-      console.log(error);
+  const safeParseSnap = (val) => {
+    if (!val) return {};
+    // إن كان فعلاً كائن JSON جاهز من mysql2
+    if (typeof val === "object") return val;
+    // إن كان string JSON صالح
+    if (typeof val === "string") {
+      try {
+        return JSON.parse(val);
+      } catch {
+        return {};
+      }
     }
+    return {};
+  };
+  const items = (data.items || []).map((it) => {
+    const snap = safeParseSnap(it.product_snapshot);
     return {
       product_id: it.product_id,
-      product_name: it.product_name || snap.name || "",
-      sku: snap.sku || null,
+      product_name: it.product_name ?? snap.name ?? "",
+      // نفضّل القيم القادمة مباشرة من الاستعلام (aliases) ثم snapshot
+      sku: it.sku ?? snap.sku ?? null,
       unit_price: Number(it.unit_price ?? snap.price ?? 0),
       qty: Number(it.qty ?? it.quantity ?? 0),
-      image: snap.image || null, // لو بتخزنها مستقبلًا
+      image: it.image ?? snap.image ?? null,
     };
   });
   return {

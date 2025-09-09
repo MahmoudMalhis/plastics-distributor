@@ -1,8 +1,8 @@
+// server/src/modules/orders/orders.service.js
 import * as repo from "./orders.repo.js";
 import db from "../../db/knex.js";
 import * as paymentsRepo from "../payments/payments.repo.js";
 
-// ----- أدوات -----
 function assertItemsValid(items = []) {
   if (!Array.isArray(items) || !items.length) {
     const e = new Error("عناصر الطلب مطلوبة");
@@ -31,13 +31,15 @@ async function hydrateItems(items = []) {
       throw e;
     }
     const unit_price = Number(
-      prod.price || prod.unit_price || it.unit_price || 0
+      it.unit_price || prod.price || prod.unit_price || 0
     );
     const snapshot = {
       id: prod.id,
       name: prod.name,
-      sku: prod.sku || prod.code || null,
+      sku: it.sku ?? prod.sku ?? prod.code ?? null,
+      image: prod.image_url ?? prod.image ?? null,
       price: unit_price,
+      unit: prod.unit || null,
     };
     out.push({
       product_id,
@@ -55,20 +57,26 @@ function calcTotal(items = []) {
 
 function normalizePayment(dto = {}) {
   const method = (dto.payment_method || "cash").toLowerCase();
-  if (!["cash", "installments", "cheque"].includes(method)) {
+
+  // تصحيح cheque/check
+  const normalizedMethod = method === "cheque" ? "checks" : method;
+
+  if (!["cash", "installments", "checks"].includes(normalizedMethod)) {
     const e = new Error("طريقة الدفع غير مدعومة");
     e.status = 400;
     throw e;
   }
+
   const res = {
-    payment_method: method,
+    payment_method: normalizedMethod,
     installment_plan_id: null,
     check_note: null,
   };
 
-  if (method === "installments") {
-    const amt = Number(dto.installment_amount);
-    const period = String(dto.installment_period || "").toLowerCase(); // weekly | monthly
+  if (normalizedMethod === "installments") {
+    const amt = Number(dto.installment_amount || 0);
+    const period = String(dto.installment_period || "monthly").toLowerCase();
+
     if (!Number.isFinite(amt) || amt <= 0) {
       const e = new Error("قيمة الدفعة غير صالحة");
       e.status = 400;
@@ -81,11 +89,25 @@ function normalizePayment(dto = {}) {
     }
     res._installment_amount = amt;
     res._installment_period = period;
-  } else if (method === "cheque") {
-    res.check_note = (dto.check_note || dto.cheque_note || "").slice(0, 255);
+  } else if (normalizedMethod === "checks") {
+    res.check_note = String(dto.check_note || dto.cheque_note || "").slice(
+      0,
+      255
+    );
   }
 
   return res;
+}
+
+function calcNextDue(period) {
+  const d = new Date();
+  if (period === "weekly") d.setDate(d.getDate() + 7);
+  else d.setMonth(d.getMonth() + 1);
+  return d;
+}
+
+function dbNow() {
+  return new Date();
 }
 
 export async function create(payload, currentUser) {
@@ -95,9 +117,13 @@ export async function create(payload, currentUser) {
     e.status = 400;
     throw e;
   }
+
+  // التعامل مع distributor_id و distributorId
   let distributor_id;
   if (currentUser?.distributor_id != null) {
     distributor_id = Number(currentUser.distributor_id);
+  } else if (currentUser?.distributorId != null) {
+    distributor_id = Number(currentUser.distributorId);
   } else if (payload.distributor_id != null) {
     distributor_id = Number(payload.distributor_id);
   } else {
@@ -107,7 +133,6 @@ export async function create(payload, currentUser) {
   }
 
   const created_by = currentUser?.id || null;
-
   const customer_id =
     payload.customer_id != null ? Number(payload.customer_id) : null;
 
@@ -116,42 +141,51 @@ export async function create(payload, currentUser) {
 
   const items = await hydrateItems(itemsDto);
   const total = calcTotal(items);
-
   const pay = normalizePayment(payload);
 
   const baseOrder = {
-    distributor_id: distributor_id,
+    distributor_id,
     created_by,
     customer_id,
     status,
     total: Number(total.toFixed(2)),
+    discount_amount: Number(payload.discount_amount || 0),
+    discount_percentage: Number(payload.discount_percentage || 0),
     notes: payload.notes || null,
     payment_method: pay.payment_method,
     installment_plan_id: null,
-    check_note: pay.check_note ?? null,
+    check_note: pay.check_note,
     submitted_at: status === "submitted" ? dbNow() : null,
     approved_at: null,
     fulfilled_at: null,
     canceled_at: null,
   };
 
+  // إنشاء الطلب
   const order = await repo.createOrder(baseOrder);
 
+  // إضافة العناصر
   if (items.length) {
     await repo.insertItems(items.map((it) => ({ ...it, order_id: order.id })));
   }
 
-  try {
-    await paymentsRepo.postLedgerDebit(db, {
-      customer_id,
-      ref_type: "order",
-      ref_id: order.id,
-      amount: total,
-    });
-  } catch (error) {
-    console.log(error);
+  // إضافة قيد دفتر إذا كان هناك عميل
+  if (customer_id) {
+    try {
+      await db.transaction(async (trx) => {
+        await paymentsRepo.postLedgerDebit(trx, {
+          customer_id,
+          ref_type: "order",
+          ref_id: order.id,
+          amount: total,
+        });
+      });
+    } catch (error) {
+      console.error("Error posting ledger debit:", error);
+    }
   }
 
+  // إنشاء خطة التقسيط إن وجدت
   if (
     pay.payment_method === "installments" &&
     pay._installment_amount &&
@@ -163,50 +197,60 @@ export async function create(payload, currentUser) {
         customer_id,
         amount: pay._installment_amount,
         period: pay._installment_period,
+        frequency: pay._installment_period,
         status: "active",
         next_due_date: calcNextDue(pay._installment_period),
+        total_amount: total,
         remaining_amount: total,
+        total_installments: Math.ceil(total / pay._installment_amount),
         paid_installments: 0,
-        frequency: pay._installment_period,
       });
+
       if (plan?.id) {
         await repo.updateOrder(order.id, { installment_plan_id: plan.id });
       }
     } catch (error) {
-      console.log(error);
+      console.error("Error creating installment plan:", error);
     }
   }
 
+  // معالجة الدفعة الأولى إن وجدت
   const fp = Number(payload.first_payment || 0);
-  if (fp > 0) {
+  if (fp > 0 && customer_id) {
     try {
-      const payment = await paymentsRepo.insertPayment({
-        customer_id,
-        order_id: order.id,
-        amount: fp,
-        method: pay.payment_method === "cheque" ? "check" : "cash",
-        reference: null,
-        note:
-          pay.payment_method === "installments"
-            ? "دفعة أولى (تقسيط)"
-            : pay.payment_method === "cheque"
-            ? "دفعة أولى (شيك)"
-            : "دفعة أولى",
-        received_at: new Date(),
-        created_by_user_id: currentUser?.id || null,
-        distributor_id,
-      });
-      await paymentsRepo.postLedgerCredit(db, {
-        customer_id,
-        ref_type: "payment",
-        ref_id: payment.id,
-        amount: fp,
+      await db.transaction(async (trx) => {
+        const paymentData = {
+          customer_id,
+          order_id: order.id,
+          amount: fp,
+          method: pay.payment_method === "checks" ? "check" : "cash",
+          note:
+            pay.payment_method === "installments"
+              ? "دفعة أولى (تقسيط)"
+              : pay.payment_method === "checks"
+              ? "دفعة أولى (شيك)"
+              : "دفعة أولى",
+          received_at: new Date(),
+          created_by: created_by,
+        };
+
+        const payment = await trx("payments").insert(paymentData);
+        const paymentId = Array.isArray(payment) ? payment[0] : payment;
+
+        await paymentsRepo.postLedgerCredit(trx, {
+          customer_id,
+          ref_type: "payment",
+          ref_id: paymentId,
+          amount: fp,
+        });
       });
     } catch (error) {
-      console.log(error);
+      console.error("Error processing first payment:", error);
     }
-    return repo.getOrderFull(order.id);
   }
+
+  // إرجاع بيانات الطلب الكاملة
+  return repo.getOrderFull(order.id);
 }
 
 export async function list(query = {}, currentUser) {
@@ -217,17 +261,15 @@ export async function list(query = {}, currentUser) {
     status: query.status ? String(query.status).toLowerCase() : undefined,
     includeDrafts: Boolean(query.includeDrafts),
   };
-  if (currentUser?.role === "distributor" && currentUser?.distributor_id) {
-    opts.distributor_id = Number(currentUser.distributor_id);
-  }
-  return repo.listOrders(opts);
-}
 
-function calcNextDue(period) {
-  const d = new Date();
-  if (period === "weekly") d.setDate(d.getDate() + 7);
-  else d.setMonth(d.getMonth() + 1);
-  return d;
+  if (currentUser?.role === "distributor") {
+    const distId = currentUser?.distributor_id || currentUser?.distributorId;
+    if (distId) {
+      opts.distributor_id = Number(distId);
+    }
+  }
+
+  return repo.listOrders(opts);
 }
 
 export async function remove(id, currentUser) {
@@ -238,18 +280,15 @@ export async function remove(id, currentUser) {
     throw e;
   }
 
-  // لو المستخدِم موزّع، لازم يكون صاحب الطلب
-  if (
-    currentUser?.role === "distributor" &&
-    currentUser?.distributor_id &&
-    Number(order.distributor_id) !== Number(currentUser.distributor_id)
-  ) {
-    const e = new Error("صلاحيات غير كافية");
-    e.status = 403;
-    throw e;
+  if (currentUser?.role === "distributor") {
+    const distId = currentUser?.distributor_id || currentUser?.distributorId;
+    if (distId && Number(order.distributor_id) !== Number(distId)) {
+      const e = new Error("صلاحيات غير كافية");
+      e.status = 403;
+      throw e;
+    }
   }
 
-  // يُسمح بحذف المسودات فقط
   if (String(order.status) !== "draft") {
     const e = new Error("لا يمكن حذف الطلب إلا إذا كان مسودة");
     e.status = 400;
@@ -278,14 +317,13 @@ export async function update(id, payload, currentUser) {
     throw e;
   }
 
-  if (
-    currentUser?.role === "distributor" &&
-    currentUser?.distributor_id &&
-    Number(order.distributor_id) !== Number(currentUser.distributor_id)
-  ) {
-    const e = new Error("صلاحيات غير كافية");
-    e.status = 403;
-    throw e;
+  if (currentUser?.role === "distributor") {
+    const distId = currentUser?.distributor_id || currentUser?.distributorId;
+    if (distId && Number(order.distributor_id) !== Number(distId)) {
+      const e = new Error("صلاحيات غير كافية");
+      e.status = 403;
+      throw e;
+    }
   }
 
   const isSubmitted = String(order.status) === "submitted";
@@ -301,7 +339,7 @@ export async function update(id, payload, currentUser) {
   const patch = {};
   if (payload.status) {
     const next = String(payload.status).toLowerCase();
-    if (!["draft", "submitted", "cancelled", "fulfilled"].includes(next)) {
+    if (!["draft", "submitted", "canceled", "fulfilled"].includes(next)) {
       const e = new Error("حالة الطلب غير صالحة");
       e.status = 400;
       throw e;
@@ -309,20 +347,17 @@ export async function update(id, payload, currentUser) {
     patch.status = next;
     if (next === "submitted" && !order.submitted_at)
       patch.submitted_at = dbNow();
-    if (next === "cancelled") patch.canceled_at = dbNow();
+    if (next === "canceled") patch.canceled_at = dbNow();
     if (next === "fulfilled") patch.fulfilled_at = dbNow();
   }
 
   if (payload.notes !== undefined) patch.notes = payload.notes || null;
 
-  if (
-    payload.payment_method !== undefined ||
-    payload.installment_amount !== undefined ||
-    payload.installment_period !== undefined ||
-    payload.check_note !== undefined ||
-    payload.cheque_note !== undefined
-  ) {
+  if (payload.payment_method !== undefined) {
     const pay = normalizePayment(payload);
+    patch.payment_method = pay.payment_method;
+    patch.check_note = pay.check_note;
+
     if (
       pay.payment_method === "installments" &&
       pay._installment_amount &&
@@ -330,16 +365,19 @@ export async function update(id, payload, currentUser) {
     ) {
       try {
         const plan = await repo.createInstallmentPlan({
+          order_id: order.id,
+          customer_id: order.customer_id,
           amount: pay._installment_amount,
           period: pay._installment_period,
+          frequency: pay._installment_period,
+          total_amount: order.total,
+          remaining_amount: order.total,
         });
         patch.installment_plan_id = plan?.id ?? null;
-      } catch {}
-    } else {
-      patch.installment_plan_id = pay.installment_plan_id ?? null;
+      } catch (error) {
+        console.error("Error creating installment plan:", error);
+      }
     }
-    patch.payment_method = pay.payment_method;
-    patch.check_note = pay.check_note ?? null;
   }
 
   let newItems = null;
@@ -354,12 +392,14 @@ export async function update(id, payload, currentUser) {
   if (isSubmitted) {
     const before = await repo.getOrderFull(order.id);
     await repo.updateOrder(order.id, patch);
+
     if (newItems) {
       await repo.deleteItemsByOrder(order.id);
       await repo.insertItems(
         newItems.map((it) => ({ ...it, order_id: order.id }))
       );
     }
+
     const after = await repo.getOrderFull(order.id);
     await repo.insertRevision({
       order_id: order.id,
@@ -369,6 +409,7 @@ export async function update(id, payload, currentUser) {
     });
   } else {
     await repo.updateOrder(order.id, patch);
+
     if (newItems) {
       await repo.deleteItemsByOrder(order.id);
       await repo.insertItems(
@@ -380,33 +421,26 @@ export async function update(id, payload, currentUser) {
   return repo.getOrderFull(order.id);
 }
 
-function dbNow() {
-  return new Date().toISOString();
-}
-
 export async function getCustomerOrders(customerId, query = {}, currentUser) {
-  // التحقق من الصلاحيات
   if (!currentUser) {
     const e = new Error("غير مصرح");
     e.status = 401;
     throw e;
   }
 
-  // جلب معلومات العميل للتحقق من الصلاحيات
   const customer = await db("customers").where({ id: customerId }).first();
-
   if (!customer) {
     const e = new Error("العميل غير موجود");
     e.status = 404;
     throw e;
   }
 
-  // التحقق من صلاحية عرض طلبات هذا العميل
   const isAdmin = currentUser.role === "admin";
+  const distId = currentUser?.distributor_id || currentUser?.distributorId;
   const isOwnerDistributor =
     currentUser.role === "distributor" &&
-    currentUser.distributor_id &&
-    Number(customer.distributor_id) === Number(currentUser.distributor_id);
+    distId &&
+    Number(customer.distributor_id) === Number(distId);
 
   if (!isAdmin && !isOwnerDistributor) {
     const e = new Error("ليس لديك صلاحية عرض طلبات هذا العميل");
@@ -414,20 +448,16 @@ export async function getCustomerOrders(customerId, query = {}, currentUser) {
     throw e;
   }
 
-  // جلب الطلبات
   const opts = {
     page: Number(query.page || 1),
     limit: Number(query.limit || 20),
     status: query.status ? String(query.status).toLowerCase() : undefined,
   };
 
-  // استخدم الدالة البسيطة (أكثر توافقاً)
   const result = await repo.listOrdersByCustomer(customerId, opts);
 
-  // إضافة معلومات إضافية للطلبات
   const enhancedRows = await Promise.all(
     result.rows.map(async (order) => {
-      // جلب معلومات خطة التقسيط إن وجدت
       let installmentPlan = null;
       if (order.installment_plan_id) {
         installmentPlan = await db("installment_plans")
@@ -435,7 +465,6 @@ export async function getCustomerOrders(customerId, query = {}, currentUser) {
           .first();
       }
 
-      // جلب إجمالي المدفوعات للطلب
       const paymentsResult = await db("payments")
         .where({ order_id: order.id })
         .sum({ total_paid: "amount" })

@@ -263,7 +263,8 @@ export default function CustomersList() {
                 </td>
                 <td className="p-3">{cust.customer_sku}</td>
                 <td className="p-3">{cust.phone || "—"}</td>
-                <td className="p-3">{currency(cust.balance)}</td>
+                <td className="p-3">{currency()}</td>
+                {console.log(cust)}
                 <td className="p-3">
                   {cust.ordersCount != null
                     ? cust.ordersCount

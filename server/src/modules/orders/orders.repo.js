@@ -10,22 +10,14 @@ export async function createOrder(order) {
       const code = await generateOrderCode(db);
       const inserted = await db("orders").insert({ ...order, code });
 
-      let id = Array.isArray(inserted) ? inserted[0] : inserted?.id;
-      if (!id) {
-        const row = await db("orders")
-          .select("id")
-          .orderBy("id", "desc")
-          .first();
-        id = row?.id;
-      }
+      const raw = Array.isArray(inserted) ? inserted[0] : inserted;
+      const id = typeof raw === "object" ? raw.insertId ?? raw.id : Number(raw);
       return getOrderById(id);
     } catch (err) {
-      // في MySQL
       const isDup =
         err?.code === "ER_DUP_ENTRY" ||
         /duplicate entry/i.test(err?.sqlMessage || err?.message || "");
       if (isDup && tries < 3) {
-        // جرّب توليد كود جديد مرة أو مرتين
         continue;
       }
       console.error("Error creating order:", err);
@@ -97,7 +89,7 @@ export async function listOrders({
 // ====== عناصر الطلب ======
 export async function insertItems(items) {
   if (!items?.length) return [];
-  const rows = await db("order_items").insert(items).returning("*");
+  const rows = await db("order_items").insert(items);
   if (Array.isArray(rows) && rows.length) return rows;
   // SQLite fallback
   const orderId = items[0].order_id;
@@ -115,6 +107,18 @@ export async function listItems(orderId) {
       "oi.id",
       "oi.product_id",
       "p.name as product_name",
+      db.raw(`
+      COALESCE(
+        NULLIF(JSON_UNQUOTE(JSON_EXTRACT(oi.product_snapshot, '$.sku')), ''),
+        p.sku
+      ) AS sku
+    `),
+      db.raw(`
+      COALESCE(
+        NULLIF(JSON_UNQUOTE(JSON_EXTRACT(oi.product_snapshot, '$.image')), ''),
+        p.image_url
+      ) AS image
+    `),
       "oi.qty",
       "oi.unit_price",
       "oi.product_snapshot"
@@ -139,11 +143,10 @@ export async function insertRevision({
     reason,
     change_set: change_set ? JSON.stringify(change_set) : null,
   };
-  const [row] = await db("order_revisions").insert(payload).returning("*");
-  return (
-    row ||
-    db("order_revisions").where({ order_id }).orderBy("id", "desc").first()
-  );
+  const inserted = await db("order_revisions").insert(payload);
+  const id = Array.isArray(inserted) ? inserted[0] : inserted;
+
+  return db("order_revisions").where({ id }).first();
 }
 
 export async function listRevisions(orderId) {
@@ -156,39 +159,29 @@ export async function listRevisions(orderId) {
 
 // ====== Installment plan (اختياري: إنشاء خطة عند الدفع بالتقسيط) ======
 export async function createInstallmentPlan(data = {}) {
-  const base = {
-    amount: Number(data.amount),
-    period: String(data.period),
+  const planData = {
+    customer_id: data.customer_id ?? null,
+    order_id: data.order_id ?? null,
+    amount_per_installment: Number(data.amount || 0),
+    frequency: data.frequency || data.period || "monthly",
+    status: data.status || "active",
+    next_due_date: data.next_due_date ?? null,
+    total_amount: data.total_amount ?? null,
+    remaining_amount: data.remaining_amount ?? null,
+    total_installments: data.total_installments ?? null,
+    paid_installments: data.paid_installments ?? 0,
+    first_payment_amount: data.first_payment_amount ?? null,
     created_at: db.fn.now(),
   };
-  // حقول اختيارية — تُحفظ فقط إن وُجدت الأعمدة
-  const extended = {
-    ...base,
-    order_id: data.order_id ?? null,
-    customer_id: data.customer_id ?? null,
-    status: data.status ?? "active",
-    next_due_date: data.next_due_date ?? null,
-    remaining_amount:
-      data.remaining_amount != null ? Number(data.remaining_amount) : null,
-    paid_installments:
-      data.paid_installments != null ? Number(data.paid_installments) : null,
-    frequency: data.frequency ?? data.period ?? null,
-  };
+
   try {
-    const [row] = await db("installment_plans").insert(extended).returning("*");
-    if (row) return row;
+    const inserted = await db("installment_plans").insert(planData);
+    const id = Array.isArray(inserted) ? inserted[0] : inserted;
+    return db("installment_plans").where({ id }).first();
   } catch (e) {
-    if (String(e?.code) !== "ER_BAD_FIELD_ERROR") throw e;
-    // fallback لأعمدة قليلة
-    const [row] = await db("installment_plans").insert(base).returning("*");
-    if (row) return row;
+    console.error("Error creating installment plan:", e);
+    throw e;
   }
-  // SQLite/MySQL قد لا يعيد returning(*)
-  const created = await db("installment_plans")
-    .where({ amount: Number(base.amount), period: String(base.period) })
-    .orderBy("id", "desc")
-    .first();
-  return created;
 }
 
 // ====== تجميع كامل للطلب ======
@@ -217,8 +210,7 @@ export async function listOrdersByCustomer(
   { page = 1, limit = 20, status } = {}
 ) {
   const base = db("orders as o")
-    .leftJoin("order_items as oi", "oi.order_id", "o.id")
-    .leftJoin("products as p", "p.id", "oi.product_id")
+    .leftJoin("customers as c", "c.id", "o.customer_id")
     .where("o.customer_id", customerId)
     .select(
       "o.id",
@@ -227,20 +219,8 @@ export async function listOrdersByCustomer(
       "o.status",
       "o.total",
       "o.payment_method",
-      "o.notes",
-      db.raw("COUNT(DISTINCT oi.id) as items_count"),
-      db.raw(`
-        JSON_ARRAYAGG(
-          JSON_OBJECT(
-            'product_id', oi.product_id,
-            'product_name', p.name,
-            'qty', oi.qty,
-            'unit_price', oi.unit_price
-          )
-        ) as items
-      `)
+      "o.notes"
     )
-    .groupBy("o.id")
     .modify((qb) => {
       if (status) qb.where("o.status", status);
     })
@@ -251,6 +231,38 @@ export async function listOrdersByCustomer(
     .offset((page - 1) * limit)
     .limit(limit);
 
+  // Get items for each order
+  const ordersWithItems = await Promise.all(
+    rows.map(async (order) => {
+      const items = await db("order_items as oi")
+        .leftJoin("products as p", "p.id", "oi.product_id")
+        .where("oi.order_id", order.id)
+        .select(
+          "oi.product_id",
+          "p.name as product_name",
+          db.raw(`
+      COALESCE(
+        NULLIF(JSON_UNQUOTE(JSON_EXTRACT(oi.product_snapshot, '$.sku')), ''),
+        p.sku
+      ) AS sku
+    `),
+          db.raw(`
+      COALESCE(
+        NULLIF(JSON_UNQUOTE(JSON_EXTRACT(oi.product_snapshot, '$.image')), ''),
+        p.image_url
+      ) AS image
+    `),
+          "oi.qty",
+          "oi.unit_price"
+        );
+      return {
+        ...order,
+        items,
+        items_count: items.length,
+      };
+    })
+  );
+
   const [{ count }] = await db("orders")
     .where({ customer_id: customerId })
     .modify((qb) => {
@@ -259,10 +271,7 @@ export async function listOrdersByCustomer(
     .count({ count: "*" });
 
   return {
-    rows: rows.map((row) => ({
-      ...row,
-      items: row.items ? JSON.parse(row.items) : [],
-    })),
+    rows: ordersWithItems,
     total: Number(count || 0),
   };
 }

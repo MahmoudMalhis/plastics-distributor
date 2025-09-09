@@ -133,7 +133,6 @@ export default function OrderDetails() {
                           <td className="p-3">
                             <div className="flex items-center gap-3">
                               <div className="w-16 h-12 bg-slate-100 rounded overflow-hidden">
-                                {console.log(it)}
                                 {it.image && (
                                   <img
                                     src={imageUrl(it.image)}
