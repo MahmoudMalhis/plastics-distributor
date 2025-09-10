@@ -16,7 +16,6 @@ import CustomersList from "./features/customers/pages/CustomersList.jsx";
 import CustomerProfile from "./features/customers/pages/CustomerProfile.jsx";
 import DistributorProfile from "./features/distributors/pages/DistributorProfile.jsx";
 import DraftOrders from "./features/orders/pages/DraftOrders.jsx";
-import CustomerOrdersPage from "./features/orders/pages/CustomerOrdersPage.jsx";
 
 export default function App() {
   return (
@@ -66,10 +65,7 @@ export default function App() {
             <Route path="/customers/:id" element={<CustomerProfile />} />
             <Route path="/orders" element={<MyOrders />} />
             <Route path="/orders/:id" element={<OrderDetails />} />
-            <Route
-              path="/orders/customer/:customerId"
-              element={<CustomerOrdersPage />}
-            />
+            <Route path="/orders/customer/:customerId" element={<MyOrders />} />
           </Route>
         </Route>
         <Route path="/unauthorized" element={<Unauthorized />} />

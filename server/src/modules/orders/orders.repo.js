@@ -45,48 +45,10 @@ export async function deleteOrderCascade(orderId) {
   });
 }
 
-export async function listOrders({
-  search,
-  page = 1,
-  limit = 20,
-  distributor_id,
-  status,
-  includeDrafts,
-}) {
-  const base = db("orders as o")
-    .leftJoin("customers as c", "c.id", "o.customer_id")
-    .select(
-      "o.id",
-      "o.code",
-      "o.created_at",
-      "o.status",
-      "o.total",
-      "o.customer_id",
-      "c.name as customer_name"
-    )
-    .modify((qb) => {
-      if (distributor_id) qb.where("o.distributor_id", distributor_id);
-      if (status) qb.where("o.status", status);
-      else if (!includeDrafts) qb.whereNot("o.status", "draft");
-      if (search) {
-        qb.where((w) => {
-          w.where("c.name", "like", `%${search}%`)
-            .orWhere("o.code", "like", `%${search}%`)
-            .orWhere("o.id", Number(search) || -1);
-        });
-      }
-    })
-    .orderBy("o.id", "desc");
-
-  const rows = await base
-    .clone()
-    .offset((page - 1) * limit)
-    .limit(limit);
-  const [{ count }] = await base.clone().clearSelect().count({ count: "*" });
-  return { rows, total: Number(count || 0) };
+export function listOrders(opts) {
+  return searchOrdersRepo({ ...opts, withItems: false, orderBy: "o.id" });
 }
 
-// ====== عناصر الطلب ======
 export async function insertItems(items) {
   if (!items?.length) return [];
   const rows = await db("order_items").insert(items);
@@ -130,7 +92,6 @@ export async function getProductById(id) {
   return db("products").where({ id }).first();
 }
 
-// ====== مراجعات ======
 export async function insertRevision({
   order_id,
   editor_user_id,
@@ -157,7 +118,6 @@ export async function listRevisions(orderId) {
     .orderBy("r.id", "desc");
 }
 
-// ====== Installment plan (اختياري: إنشاء خطة عند الدفع بالتقسيط) ======
 export async function createInstallmentPlan(data = {}) {
   const planData = {
     customer_id: data.customer_id ?? null,
@@ -184,7 +144,6 @@ export async function createInstallmentPlan(data = {}) {
   }
 }
 
-// ====== تجميع كامل للطلب ======
 export async function getOrderFull(id) {
   const order = await getOrderById(id);
   if (!order) return null;
@@ -205,73 +164,135 @@ export async function getOrderFull(id) {
   };
 }
 
-export async function listOrdersByCustomer(
-  customerId,
-  { page = 1, limit = 20, status } = {}
-) {
-  const base = db("orders as o")
+export function listOrdersByCustomer(customerId, opts) {
+  return searchOrdersRepo({
+    ...opts,
+    customer_id: customerId,
+    withItems: false,
+    orderBy: "o.created_at",
+  });
+}
+
+function baseOrdersQuery() {
+  return db("orders as o")
     .leftJoin("customers as c", "c.id", "o.customer_id")
-    .where("o.customer_id", customerId)
     .select(
       "o.id",
       "o.code",
       "o.created_at",
       "o.status",
       "o.total",
+      "o.customer_id",
       "o.payment_method",
-      "o.notes"
-    )
-    .modify((qb) => {
-      if (status) qb.where("o.status", status);
-    })
-    .orderBy("o.created_at", "desc");
+      "o.check_note",
+      "o.installment_plan_id",
+      "c.name as customer_name"
+    );
+}
 
-  const rows = await base
+function withPaymentAndPlan(qb) {
+  const payAgg = db("payments")
+    .select("order_id")
+    .sum({ total_paid: "amount" })
+    .groupBy("order_id")
+    .as("p");
+
+  qb.leftJoin(payAgg, "p.order_id", "o.id")
+    .leftJoin("installment_plans as ip", "ip.id", "o.installment_plan_id")
+    .select(
+      db.raw("COALESCE(p.total_paid, 0) as total_paid"),
+      db.raw(`
+       GREATEST(
+         COALESCE(o.total,0)
+           - (COALESCE(o.total,0) * COALESCE(o.discount_percentage,0) / 100.0)
+           - COALESCE(o.discount_amount,0),
+         0
+       ) AS payable_total
+     `),
+      db.raw(`
+       GREATEST(
+         (
+           COALESCE(o.total,0)
+           - (COALESCE(o.total,0) * COALESCE(o.discount_percentage,0) / 100.0)
+           - COALESCE(o.discount_amount,0)
+         ) - COALESCE(p.total_paid,0),
+         0
+       ) AS remaining_amount
+     `),
+      "ip.amount_per_installment as installment_amount",
+      "ip.frequency as installment_period"
+    );
+
+  return qb;
+}
+
+export async function searchOrdersRepo({
+  search,
+  page = 1,
+  limit = 20,
+  distributor_id,
+  customer_id,
+  status,
+  includeDrafts = false,
+  orderBy = "o.id",
+  orderDir = "desc",
+  withItems = false,
+} = {}) {
+  let qb = withPaymentAndPlan(baseOrdersQuery())
+    .modify((q) => {
+      if (distributor_id) q.where("o.distributor_id", distributor_id);
+      if (customer_id) q.where("o.customer_id", customer_id);
+      if (status) q.where("o.status", status);
+      else if (!includeDrafts) q.whereNot("o.status", "draft");
+      if (search) {
+        q.where((w) => {
+          w.where("c.name", "like", `%${search}%`)
+            .orWhere("o.code", "like", `%${search}%`)
+            .orWhere("o.id", Number(search) || -1);
+        });
+      }
+    })
+    .orderBy(orderBy, orderDir);
+
+  const rows = await qb
     .clone()
     .offset((page - 1) * limit)
     .limit(limit);
+  const [{ count }] = await qb.clone().clearSelect().count({ count: "*" });
 
-  // Get items for each order
-  const ordersWithItems = await Promise.all(
-    rows.map(async (order) => {
-      const items = await db("order_items as oi")
+  let resultRows = rows;
+
+  if (withItems) {
+    const itemsOf = async (orderId) =>
+      db("order_items as oi")
         .leftJoin("products as p", "p.id", "oi.product_id")
-        .where("oi.order_id", order.id)
+        .where("oi.order_id", orderId)
         .select(
           "oi.product_id",
           "p.name as product_name",
           db.raw(`
-      COALESCE(
-        NULLIF(JSON_UNQUOTE(JSON_EXTRACT(oi.product_snapshot, '$.sku')), ''),
-        p.sku
-      ) AS sku
-    `),
+            COALESCE(
+              NULLIF(JSON_UNQUOTE(JSON_EXTRACT(oi.product_snapshot, '$.sku')), ''),
+              p.sku
+            ) AS sku
+          `),
           db.raw(`
-      COALESCE(
-        NULLIF(JSON_UNQUOTE(JSON_EXTRACT(oi.product_snapshot, '$.image')), ''),
-        p.image_url
-      ) AS image
-    `),
+            COALESCE(
+              NULLIF(JSON_UNQUOTE(JSON_EXTRACT(oi.product_snapshot, '$.image')), ''),
+              p.image_url
+            ) AS image
+          `),
           "oi.qty",
           "oi.unit_price"
         );
-      return {
-        ...order,
-        items,
-        items_count: items.length,
-      };
-    })
-  );
 
-  const [{ count }] = await db("orders")
-    .where({ customer_id: customerId })
-    .modify((qb) => {
-      if (status) qb.where("status", status);
-    })
-    .count({ count: "*" });
+    resultRows = await Promise.all(
+      rows.map(async (o) => {
+        const items = await itemsOf(o.id);
+        return { ...o, items, items_count: items.length };
+      })
+    );
+  }
 
-  return {
-    rows: ordersWithItems,
-    total: Number(count || 0),
-  };
+  return { rows: resultRows, total: Number(count || 0) };
 }

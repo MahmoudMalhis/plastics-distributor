@@ -19,8 +19,10 @@ function normalizeUser(u) {
 
 export async function list(req, res, next) {
   try {
-    const rows = await svc.list(req.query, normalizeUser(req.user));
-    res.json(Array.isArray(rows) ? rows : { items: rows });
+    const out = await svc.list(req.query, normalizeUser(req.user));
+    res.json(
+      Array.isArray(out?.rows) ? out : { items: out.rows, total: out.total }
+    );
   } catch (e) {
     next(e);
   }

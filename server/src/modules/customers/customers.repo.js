@@ -1,42 +1,85 @@
 import db from "../../db/knex.js";
 
 // البحث أو جلب العملاء مع دعم التصفية والصفحات
-export async function list({ search, page, limit, distributor_id } = {}) {
-  const qb = db("customers as c").select(
-    "c.id",
-    "c.name",
-    "c.customer_sku",
-    "c.phone",
-    "c.address",
-    "c.notes",
-    "c.distributor_id",
-    "c.latitude",
-    "c.longitude",
-    "c.active",
-    "c.created_at"
-  );
+export async function list({
+  search,
+  page = 1,
+  limit = 20,
+  distributor_id,
+} = {}) {
+  const ordersAgg = db("orders")
+    .select("customer_id")
+    .count({ orders_count: "*" })
+    .groupBy("customer_id")
+    .as("o");
 
-  if (distributor_id != null) {
-    qb.where("c.distributor_id", Number(distributor_id));
-  }
+  const ledgerAgg = db("ledger_entries")
+    .select("customer_id")
+    .sum({ debit_sum: "debit" })
+    .sum({ credit_sum: "credit" })
+    .groupBy("customer_id")
+    .as("l");
 
-  if (search) {
-    const term = String(search).toLowerCase();
-    const like = `%${term.replace(/[%_]/g, "\\$&")}%`;
-    qb.where((q) => {
-      q.whereRaw("LOWER(c.name) LIKE ?", [like]).orWhereRaw(
-        "LOWER(c.customer_sku) LIKE ?",
-        [like]
-      );
-    });
-  }
-  qb.orderBy("c.name", "asc");
-  const take = Number(limit) > 0 ? Number(limit) : null;
-  const pageNum = Number(page) > 0 ? Number(page) : 1;
-  if (take) {
-    qb.limit(take).offset((pageNum - 1) * take);
-  }
-  return qb;
+  const base = db("customers as c")
+    .leftJoin(ordersAgg, "o.customer_id", "c.id")
+    .leftJoin(ledgerAgg, "l.customer_id", "c.id")
+    .modify((qb) => {
+      if (distributor_id != null) {
+        qb.where("c.distributor_id", Number(distributor_id));
+      }
+      if (search) {
+        const term = String(search).toLowerCase();
+        const like = `%${term.replace(/[%_]/g, "\\$&")}%`;
+        qb.where((w) => {
+          w.whereRaw("LOWER(c.name) LIKE ?", [like])
+            .orWhereRaw("LOWER(c.customer_sku) LIKE ?", [like])
+            .orWhereRaw("LOWER(c.phone) LIKE ?", [like]);
+        });
+      }
+    })
+    .select(
+      "c.id",
+      "c.name",
+      "c.customer_sku",
+      "c.phone",
+      "c.address",
+      "c.notes",
+      "c.distributor_id",
+      "c.latitude",
+      "c.longitude",
+      "c.active",
+      "c.created_at",
+      db.raw("COALESCE(o.orders_count, 0) AS orders_count"),
+      db.raw("(COALESCE(l.debit_sum,0) - COALESCE(l.credit_sum,0)) AS balance")
+    )
+    .orderBy("c.name", "asc");
+
+  const take = Math.max(1, Number(limit) || 20);
+  const pageNum = Math.max(1, Number(page) || 1);
+
+  const rows = await base
+    .clone()
+    .limit(take)
+    .offset((pageNum - 1) * take);
+
+  const [{ count }] = await db("customers as c")
+    .modify((qb) => {
+      if (distributor_id != null) {
+        qb.where("c.distributor_id", Number(distributor_id));
+      }
+      if (search) {
+        const term = String(search).toLowerCase();
+        const like = `%${term.replace(/[%_]/g, "\\$&")}%`;
+        qb.where((w) => {
+          w.whereRaw("LOWER(c.name) LIKE ?", [like])
+            .orWhereRaw("LOWER(c.customer_sku) LIKE ?", [like])
+            .orWhereRaw("LOWER(c.phone) LIKE ?", [like]);
+        });
+      }
+    })
+    .count({ count: "*" });
+
+  return { rows, total: Number(count || 0) };
 }
 
 // إنشاء عميل جديد

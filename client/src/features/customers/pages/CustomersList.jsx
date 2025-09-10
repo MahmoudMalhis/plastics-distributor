@@ -50,24 +50,8 @@ export default function CustomersList() {
 
             // جلب كل العملاء
             const { rows } = await listCustomers({ search, page, limit });
-
-            if (!cancelled) {
-              const user = JSON.parse(localStorage.getItem("user")) || {};
-              const isAdmin = user.role === "admin";
-              const myDistId = user.distributor_id ?? null;
-
-              // إذا كنت Admin نحتفظ بجميع الصفوف، وإن كنت موزعًا نُصفّى حسب distributor_id
-              const filtered = isAdmin
-                ? rows || []
-                : (rows || []).filter(
-                    (c) =>
-                      myDistId != null &&
-                      Number(c.distributor_id) === Number(myDistId)
-                  );
-
-              setItems(filtered);
-              setTotal(filtered.length);
-            }
+            setItems(rows || []);
+            setTotal(Number(total || rows?.length || 0));
           } catch (e) {
             if (!cancelled) {
               setError(e?.response?.data?.error || "فشل جلب العملاء");
@@ -84,7 +68,7 @@ export default function CustomersList() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [search, page, limit]);
+  }, [search, page, limit, total]);
 
   const pages = useMemo(
     () => Math.max(1, Math.ceil(total / limit)),
@@ -261,14 +245,13 @@ export default function CustomersList() {
                     {cust.name}
                   </Link>
                 </td>
+                {console.log(cust)}
                 <td className="p-3">{cust.customer_sku}</td>
                 <td className="p-3">{cust.phone || "—"}</td>
-                <td className="p-3">{currency()}</td>
+                <td className="p-3">{currency(cust.balance)}</td>
                 {console.log(cust)}
                 <td className="p-3">
-                  {cust.ordersCount != null
-                    ? cust.ordersCount
-                    : cust.orders_count || 0}
+                  {cust.orders_count ?? cust.ordersCount ?? 0}
                 </td>
                 <td className="p-3 text-center">
                   {cust.active ? (

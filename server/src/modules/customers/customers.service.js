@@ -55,13 +55,11 @@ function assertLatLng(lat, lng) {
 
 // قائمة العملاء
 export function list(opts = {}, currentUser) {
+  const base = { ...opts };
   if (currentUser?.role === "distributor" && currentUser?.distributor_id) {
-    return repo.list({
-      ...opts,
-      distributor_id: Number(currentUser.distributor_id),
-    });
+    base.distributor_id = Number(currentUser.distributor_id);
   }
-  return repo.list(opts);
+  return repo.list(base);
 }
 
 // إنشاء عميل مع توليد SKU إن لم يزود
