@@ -62,6 +62,27 @@ export default function CartEditor() {
     installmentPeriod,
   ]);
 
+  const { subtotal, clampedFirstPayment, remainingAfterFirst } = useMemo(() => {
+    const subtotal = Number(totals.subtotal || 0);
+
+    // لو عندك خصومات لاحقًا حطها هون:
+    const discountAmount = 0; // من state لو أضفت حقل خصم ثابت
+    const discountPct = 0; // من state لو أضفت خصم نسبة
+    const afterPct = subtotal - (subtotal * discountPct) / 100;
+    const payableTotal = Math.max(0, afterPct - discountAmount);
+
+    const fp = Math.max(0, Number(firstPayment || 0));
+    const clampedFirstPayment = Math.min(fp, payableTotal); // ما يتجاوز المستحق
+    const remainingAfterFirst = Math.max(0, payableTotal - clampedFirstPayment);
+
+    return {
+      subtotal,
+      payableTotal,
+      clampedFirstPayment,
+      remainingAfterFirst,
+    };
+  }, [totals.subtotal, firstPayment /*, discountAmount, discountPct */]);
+
   useEffect(() => {
     async function fetchDraftOrders() {
       const drafts = await listMyOrders({ status: "draft" });
@@ -98,7 +119,7 @@ export default function CartEditor() {
 
       const enhancedItems = items.map((item) => ({
         ...item,
-        productId: item.productId,
+        product_id: item.productId,
         qty: item.qty,
         sku: item.sku,
         price: item.price,
@@ -329,10 +350,22 @@ export default function CartEditor() {
               <div className="flex items-center justify-between mt-1">
                 <div className="text-[#49739c]">الإجمالي</div>
                 <div className="text-[#0d141c] font-extrabold">
-                  ₪ {totals.subtotal.toLocaleString()}
+                  ₪ {subtotal.toLocaleString()}
+                </div>
+              </div>
+              <div className="flex items-center justify-between mt-1">
+                <div className="text-[#49739c]">الدفعة الأولى</div>
+                <div className="text-[#0d141c] font-bold">
+                  ₪ {clampedFirstPayment.toLocaleString()}
                 </div>
               </div>
 
+              <div className="flex items-center justify-between mt-1">
+                <div className="text-[#49739c]">المتبقي الآن</div>
+                <div className="text-[#0d141c] font-extrabold">
+                  ₪ {remainingAfterFirst.toLocaleString()}
+                </div>
+              </div>
               {/* أزرار */}
               <div className="flex flex-col gap-2 mt-4">
                 <button

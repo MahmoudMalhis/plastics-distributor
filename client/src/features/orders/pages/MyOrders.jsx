@@ -247,7 +247,8 @@ export default function MyOrders() {
                         />
                       </td>
                       <td className="p-3">{prettyPayment(o.payment_method)}</td>
-                      <td className="p-3">{currency(o.total)}</td>
+                      {console.log(o)}
+                      <td className="p-3">{currency(o.payable_total)}</td>
                       <td className="p-3 text-sm text-slate-600">
                         {o.payment_method === "installments" &&
                         o.installment_plan ? (

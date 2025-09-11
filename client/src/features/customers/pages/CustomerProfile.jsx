@@ -71,7 +71,7 @@ export default function CustomerProfile() {
     );
   }
 
-  const balance = Number(customer.balance || 0);
+  const balance = Number(customer?.balance ?? customer?.customer?.balance ?? 0);
 
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50">
